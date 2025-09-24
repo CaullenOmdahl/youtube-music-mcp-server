@@ -1,18 +1,33 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
 
 // Configuration schema for user-level settings
-export const configSchema = z.object({
-  debug: z.boolean().default(false).describe("Enable debug logging"),
-  cookies: z.string().describe("YouTube Music cookies for authentication"),
-});
+export const configSchema = {
+  type: "object",
+  properties: {
+    debug: {
+      type: "boolean",
+      default: false,
+      description: "Enable debug logging"
+    },
+    cookies: {
+      type: "string",
+      description: "YouTube Music cookies for authentication"
+    }
+  },
+  required: ["cookies"]
+};
+
+interface Config {
+  debug?: boolean;
+  cookies: string;
+}
 
 function createMcpServer({
   config,
 }: {
-  config: z.infer<typeof configSchema>
+  config: Config
 }) {
   const server = new McpServer({
     name: "YouTube Music Manager",
