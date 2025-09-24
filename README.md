@@ -58,20 +58,65 @@ config:
 
 ### Getting YouTube Music Cookies
 
-**Method 1: Browser Developer Tools (Recommended)**
-1. Open [music.youtube.com](https://music.youtube.com) and log in
-2. Press `F12` to open Developer Tools
-3. Go to **Network** tab
-4. Refresh the page or search for music
-5. Click on any request to `music.youtube.com`
-6. Find the `Cookie:` header in Request Headers
-7. Copy the entire cookie string
+**Method 1: Google Chrome Developer Tools (Recommended)**
 
-**Method 2: Browser Extension**
-1. Install "Cookie Editor" extension
+1. **Open YouTube Music**
+   - Go to [music.youtube.com](https://music.youtube.com) in Google Chrome
+   - Make sure you're logged into your Google account
+
+2. **Open Developer Tools**
+   - Right-click anywhere on the page → **"Inspect"**
+   - Or press `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Opt+I` (Mac)
+   - Or press `F12`
+
+3. **Navigate to Network Tab**
+   - Click the **"Network"** tab at the top of Developer Tools
+   - If you don't see it, click the `>>` arrows to find more tabs
+
+4. **Capture Network Requests**
+   - With Network tab open, refresh the page (`F5` or `Ctrl+R`)
+   - Or search for something in YouTube Music
+   - You'll see network requests appearing in the list
+
+5. **Find YouTube Music Request**
+   - Look for requests with **Name** starting with:
+     - `music.youtube.com`
+     - `youtubei/v1/`
+     - `browse` or `search`
+   - Click on any of these requests
+
+6. **Copy Cookie Header**
+   - In the request details, find the **"Request Headers"** section
+   - Scroll down to find the line that starts with `Cookie:`
+   - **Right-click** on the cookie value → **"Copy value"**
+   - Or select all the text after `Cookie:` and copy it
+
+7. **Verify Cookie Format**
+   - Your copied cookie should look like:
+   ```
+   __Secure-1PSID=g.a000abc123...; __Secure-1PAPISID=def456...; SAPISID=ghi789...; HSID=jkl012...
+   ```
+   - It should be one long line with semicolons separating different cookie values
+
+**Method 2: Chrome Application Tab (Alternative)**
+
+1. **Open YouTube Music** and log in
+2. **Open Developer Tools** (`F12`)
+3. **Go to Application Tab**
+   - Click **"Application"** tab (may be under `>>` if hidden)
+4. **Navigate to Cookies**
+   - In left sidebar, expand **"Cookies"**
+   - Click on **"https://music.youtube.com"**
+5. **Copy Cookie Values**
+   - You'll see individual cookies in a table
+   - Copy the **Value** column for each cookie
+   - Format them as: `name1=value1; name2=value2; name3=value3`
+
+**Method 3: Browser Extension (Easiest)**
+1. Install **"Cookie Editor"** extension from Chrome Web Store
 2. Go to YouTube Music and log in
-3. Click the extension icon
-4. Export cookies for `music.youtube.com`
+3. Click the Cookie Editor extension icon
+4. Select **"Export"** → **"Header String"** for `music.youtube.com`
 5. Copy the formatted cookie string
 
 **Cookie Format Example:**
