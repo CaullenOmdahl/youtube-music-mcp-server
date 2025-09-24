@@ -2,13 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
-import {
-  SearchToolRequestSchema,
-  CreatePlaylistRequestSchema,
-  AddSongsToPlaylistRequestSchema,
-  RemoveSongsFromPlaylistRequestSchema,
-  GetPlaylistRequestSchema
-} from "./types.js";
 
 // Configuration schema for user-level settings
 export const configSchema = z.object({
@@ -56,7 +49,30 @@ function createMcpServer({
     {
       title: "Search YouTube Music",
       description: "Search for songs, artists, albums, or playlists on YouTube Music",
-      inputSchema: SearchToolRequestSchema,
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query",
+            minLength: 1
+          },
+          type: {
+            type: "string",
+            description: "Type of search",
+            enum: ["songs", "artists", "albums", "playlists", "all"],
+            default: "all"
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results",
+            minimum: 1,
+            maximum: 50,
+            default: 10
+          }
+        },
+        required: ["query"]
+      } as any,
     },
     async (args) => {
       try {
@@ -121,14 +137,40 @@ function createMcpServer({
     {
       title: "Generate Playlist Suggestions",
       description: "Generate curated playlist suggestions based on mood, decade, or seed songs with option to save favorites",
-      inputSchema: z.object({
-        mood: z.enum(['energetic', 'chill', 'focus', 'party', 'workout', 'sleep']).optional().describe("Mood for the playlist"),
-        decade: z.number().optional().describe("Decade for throwback playlist (e.g., 1990, 2000)"),
-        durationMinutes: z.number().optional().describe("Target duration in minutes"),
-        includeExplicit: z.boolean().default(true).describe("Include explicit content"),
-        saveFirstSuggestion: z.boolean().default(false).describe("Automatically save the first/best suggestion to your YouTube Music account"),
-        privacy: z.enum(['PUBLIC', 'PRIVATE', 'UNLISTED']).default('PRIVATE').describe("Privacy setting if saving playlist"),
-      }),
+      inputSchema: {
+        type: "object",
+        properties: {
+          mood: {
+            type: "string",
+            enum: ['energetic', 'chill', 'focus', 'party', 'workout', 'sleep'],
+            description: "Mood for the playlist"
+          },
+          decade: {
+            type: "number",
+            description: "Decade for throwback playlist (e.g., 1990, 2000)"
+          },
+          durationMinutes: {
+            type: "number",
+            description: "Target duration in minutes"
+          },
+          includeExplicit: {
+            type: "boolean",
+            default: true,
+            description: "Include explicit content"
+          },
+          saveFirstSuggestion: {
+            type: "boolean",
+            default: false,
+            description: "Automatically save the first/best suggestion to your YouTube Music account"
+          },
+          privacy: {
+            type: "string",
+            enum: ['PUBLIC', 'PRIVATE', 'UNLISTED'],
+            default: 'PRIVATE',
+            description: "Privacy setting if saving playlist"
+          }
+        }
+      } as any,
     },
     async (args) => {
       try {
@@ -220,13 +262,36 @@ function createMcpServer({
     {
       title: "Create Smart Playlist",
       description: "Create a playlist based on natural language description and save it to your YouTube Music account",
-      inputSchema: z.object({
-        description: z.string().describe("Natural language description of the desired playlist"),
-        targetLength: z.number().default(25).describe("Target number of songs"),
-        saveToAccount: z.boolean().default(true).describe("Automatically save the playlist to your YouTube Music account"),
-        playlistTitle: z.string().optional().describe("Custom title for the saved playlist (auto-generated if not provided)"),
-        privacy: z.enum(['PUBLIC', 'PRIVATE', 'UNLISTED']).default('PRIVATE').describe("Privacy setting for the saved playlist"),
-      }),
+      inputSchema: {
+        type: "object",
+        properties: {
+          description: {
+            type: "string",
+            description: "Natural language description of the desired playlist"
+          },
+          targetLength: {
+            type: "number",
+            default: 25,
+            description: "Target number of songs"
+          },
+          saveToAccount: {
+            type: "boolean",
+            default: true,
+            description: "Automatically save the playlist to your YouTube Music account"
+          },
+          playlistTitle: {
+            type: "string",
+            description: "Custom title for the saved playlist (auto-generated if not provided)"
+          },
+          privacy: {
+            type: "string",
+            enum: ['PUBLIC', 'PRIVATE', 'UNLISTED'],
+            default: 'PRIVATE',
+            description: "Privacy setting for the saved playlist"
+          }
+        },
+        required: ["description"]
+      } as any,
     },
     async (args) => {
       try {
@@ -298,9 +363,16 @@ function createMcpServer({
     {
       title: "Authenticate with YouTube Music",
       description: "Authenticate using YouTube Music cookies to access library features",
-      inputSchema: z.object({
-        cookies: z.string().describe("YouTube Music cookies string"),
-      }),
+      inputSchema: {
+        type: "object",
+        properties: {
+          cookies: {
+            type: "string",
+            description: "YouTube Music cookies string"
+          }
+        },
+        required: ["cookies"]
+      } as any,
     },
     async (args) => {
       try {
@@ -322,7 +394,10 @@ function createMcpServer({
     {
       title: "Get Authentication Status",
       description: "Check current authentication status with YouTube Music",
-      inputSchema: z.object({}),
+      inputSchema: {
+        type: "object",
+        properties: {}
+      } as any,
     },
     async () => {
       const status = ytmusicClient.getAuthStatus();
@@ -348,7 +423,10 @@ function createMcpServer({
     {
       title: "Clear Authentication",
       description: "Clear stored authentication credentials",
-      inputSchema: z.object({}),
+      inputSchema: {
+        type: "object",
+        properties: {}
+      } as any,
     },
     async () => {
       try {
@@ -370,7 +448,31 @@ function createMcpServer({
     {
       title: "Create YouTube Music Playlist",
       description: "Create a new playlist in your YouTube Music account and optionally add songs to it",
-      inputSchema: CreatePlaylistRequestSchema,
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Playlist title"
+          },
+          description: {
+            type: "string",
+            description: "Playlist description"
+          },
+          privacy: {
+            type: "string",
+            enum: ['PUBLIC', 'PRIVATE', 'UNLISTED'],
+            default: 'PRIVATE',
+            description: "Privacy setting"
+          },
+          songIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of YouTube Music video IDs to add"
+          }
+        },
+        required: ["title"]
+      } as any,
     },
     async (args) => {
       try {
@@ -412,7 +514,21 @@ function createMcpServer({
     {
       title: "Add Songs to Playlist",
       description: "Add songs to an existing YouTube Music playlist",
-      inputSchema: AddSongsToPlaylistRequestSchema,
+      inputSchema: {
+        type: "object",
+        properties: {
+          playlistId: {
+            type: "string",
+            description: "Playlist ID"
+          },
+          songIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of YouTube Music video IDs to add"
+          }
+        },
+        required: ["playlistId", "songIds"]
+      } as any,
     },
     async (args) => {
       try {
@@ -439,7 +555,10 @@ function createMcpServer({
     {
       title: "Get My Playlists",
       description: "List all playlists in your YouTube Music library",
-      inputSchema: z.object({}),
+      inputSchema: {
+        type: "object",
+        properties: {}
+      } as any,
     },
     async () => {
       try {
@@ -479,7 +598,23 @@ function createMcpServer({
     {
       title: "Get Playlist Details",
       description: "Get detailed information about a specific playlist including its songs",
-      inputSchema: GetPlaylistRequestSchema,
+      inputSchema: {
+        type: "object",
+        properties: {
+          playlistId: {
+            type: "string",
+            description: "Playlist ID to fetch"
+          },
+          limit: {
+            type: "number",
+            minimum: 1,
+            maximum: 200,
+            default: 100,
+            description: "Maximum number of songs to fetch"
+          }
+        },
+        required: ["playlistId"]
+      } as any,
     },
     async (args) => {
       try {
