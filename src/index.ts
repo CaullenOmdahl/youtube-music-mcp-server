@@ -5,7 +5,7 @@ import { PlaylistCurator } from "./curation.js";
 
 // Export config schema for Smithery to use
 export const configSchema = z.object({
-  cookies: z.string().describe("YouTube Music cookies from music.youtube.com (required for all features)"),
+  cookies: z.string().optional().describe("YouTube Music cookies from music.youtube.com (required for all features)"),
   debug: z.boolean().optional().default(false).describe("Enable debug logging"),
 });
 
@@ -439,6 +439,56 @@ function createMcpServer({
       } catch (error) {
         return {
           content: [{ type: "text", text: `Error checking auth status: ${error}` }],
+        };
+      }
+    }
+  );
+
+  // Authenticate Tool - Direct authentication bypass for config issues
+  server.tool(
+    "authenticate",
+    {
+      description: "Authenticate with YouTube Music using cookies directly",
+      inputSchema: {
+        type: "object",
+        properties: {
+          cookies: {
+            type: "string",
+            description: "YouTube Music cookies from your browser"
+          }
+        },
+        required: ["cookies"]
+      } as any,
+    },
+    async (args) => {
+      try {
+        console.log("Direct authentication requested with cookies length:", args.cookies?.length);
+
+        // Directly authenticate bypassing config
+        await ytmusicClient.initialize();
+        await ytmusicClient.authenticate(args.cookies);
+
+        // Update the config reference for future calls
+        config.cookies = args.cookies;
+
+        // Force re-initialization
+        initialized = false;
+        await ensureInitialized();
+
+        const status = ytmusicClient.getAuthStatus();
+
+        let statusText = "🎉 Authentication successful!\n\n";
+        statusText += `Authenticated: ${status.authenticated ? "✅ Yes" : "❌ No"}\n`;
+        statusText += `Has valid credentials: ${status.hasCredentials ? "✅ Yes" : "❌ No"}\n`;
+        statusText += "\nYou can now search and create playlists!";
+
+        return {
+          content: [{ type: "text", text: statusText }],
+        };
+      } catch (error) {
+        console.error("Authentication error:", error);
+        return {
+          content: [{ type: "text", text: `Error authenticating: ${error}` }],
         };
       }
     }
