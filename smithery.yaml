@@ -9,6 +9,6 @@ config:
 
   cookies:
     type: string
-    required: false
-    description: "YouTube Music authentication cookies (REQUIRED for functionality - get from music.youtube.com after logging in)"
+    required: true
+    description: "YouTube Music authentication cookies - get from music.youtube.com after logging in"
     sensitive: true

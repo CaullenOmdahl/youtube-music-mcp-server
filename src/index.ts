@@ -14,7 +14,7 @@ import {
 // Configuration schema for user-level settings
 export const configSchema = z.object({
   debug: z.boolean().default(false).describe("Enable debug logging"),
-  cookies: z.string().optional().describe("YouTube Music cookies for authentication (required for full functionality)"),
+  cookies: z.string().describe("YouTube Music cookies for authentication"),
 });
 
 function createMcpServer({
@@ -37,17 +37,10 @@ function createMcpServer({
     if (!initialized) {
       try {
         await ytmusicClient.initialize();
+        await ytmusicClient.authenticate(config.cookies);
 
-        // Authenticate with cookies if provided
-        if (config.cookies && config.cookies.trim().length > 0) {
-          await ytmusicClient.authenticate(config.cookies);
-          if (config.debug) {
-            console.log("YouTube Music client initialized and authenticated successfully");
-          }
-        } else {
-          if (config.debug) {
-            console.log("YouTube Music client initialized without authentication (cookies not provided)");
-          }
+        if (config.debug) {
+          console.log("YouTube Music client initialized and authenticated successfully");
         }
 
         initialized = true;
@@ -67,16 +60,6 @@ function createMcpServer({
       inputSchema: SearchToolRequestSchema,
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to use this server.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const results = await ytmusicClient.search(args);
@@ -126,11 +109,6 @@ function createMcpServer({
           content: [{ type: "text", text: resultText }],
         };
       } catch (error) {
-        if (error.message && error.message.includes('Failed to initialize')) {
-          return {
-            content: [{ type: "text", text: `❌ **Initialization Error**\n\nFailed to initialize YouTube Music client. Please check your cookies and try again.\n\nError: ${error.message}` }],
-          };
-        }
         return {
           content: [{ type: "text", text: `Error searching YouTube Music: ${error}` }],
         };
@@ -154,16 +132,6 @@ function createMcpServer({
       }),
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to generate playlists.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const suggestions = await playlistCurator.generatePlaylistSuggestions(
@@ -262,16 +230,6 @@ function createMcpServer({
       }),
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to create smart playlists.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const playlist = await playlistCurator.createSmartPlaylist(
@@ -416,16 +374,6 @@ function createMcpServer({
       inputSchema: CreatePlaylistRequestSchema,
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to create playlists.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const result = await ytmusicClient.createPlaylist(
@@ -468,16 +416,6 @@ function createMcpServer({
       inputSchema: AddSongsToPlaylistRequestSchema,
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to modify playlists.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         await ytmusicClient.addSongsToPlaylist(args.playlistId, args.songIds);
@@ -505,16 +443,6 @@ function createMcpServer({
       inputSchema: z.object({}),
     },
     async () => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to access your playlists.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const playlists = await ytmusicClient.getLibraryPlaylists();
@@ -555,16 +483,6 @@ function createMcpServer({
       inputSchema: GetPlaylistRequestSchema,
     },
     async (args) => {
-      // Check if cookies are configured first
-      if (!config.cookies || config.cookies.trim().length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ **Authentication Required**\n\nYouTube Music cookies must be configured to access playlist details.\n\nPlease:\n1. Configure your cookies in the server settings\n2. Get cookies from music.youtube.com (see README for instructions)\n3. Restart the server after configuration"
-          }],
-        };
-      }
-
       try {
         await ensureInitialized();
         const { playlist, songs } = await ytmusicClient.getPlaylist(args);
