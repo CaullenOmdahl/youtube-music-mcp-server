@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createStatelessServer } from "@smithery/sdk/server/stateless.js";
 import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
@@ -519,10 +518,5 @@ function createMcpServer({
   return server.server;
 }
 
-// Export the original function for compatibility
+// Export the MCP server creation function for Smithery
 export default createMcpServer;
-
-// Create the stateless server for Smithery deployment
-if (process.env.NODE_ENV !== 'test') {
-  createStatelessServer(createMcpServer).app.listen(process.env.PORT || 3000);
-}
