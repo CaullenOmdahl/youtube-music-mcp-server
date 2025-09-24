@@ -21,7 +21,7 @@ export const configSchema = {
 
 interface Config {
   debug?: boolean;
-  cookies: string;
+  cookies?: string;
 }
 
 function createMcpServer({
@@ -44,9 +44,11 @@ function createMcpServer({
     if (!initialized) {
       try {
         await ytmusicClient.initialize();
-        await ytmusicClient.authenticate(config.cookies);
+        if (config?.cookies) {
+          await ytmusicClient.authenticate(config.cookies);
+        }
 
-        if (config.debug) {
+        if (config?.debug) {
           console.log("YouTube Music client initialized and authenticated successfully");
         }
 
