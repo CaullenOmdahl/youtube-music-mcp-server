@@ -2,23 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
 
-// Configuration schema for user-level settings
-export const configSchema = {
-  type: "object",
-  properties: {
-    debug: {
-      type: "boolean",
-      default: false,
-      description: "Enable debug logging"
-    },
-    cookies: {
-      type: "string",
-      description: "YouTube Music cookies for authentication"
-    }
-  },
-  required: ["cookies"]
-};
-
 interface Config {
   debug?: boolean;
   cookies?: string;
