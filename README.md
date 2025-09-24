@@ -2,14 +2,16 @@
 
 A Model Context Protocol (MCP) server that integrates YouTube Music functionality with Claude AI. Search for music, generate intelligent playlist suggestions, and create curated playlists based on mood, decade, or natural language descriptions.
 
-**6 Tools Available**: `search`, `generate_playlist_suggestions`, `create_smart_playlist`, `authenticate`, `get_auth_status`, `clear_auth`
+**10 Tools Available**: `search`, `generate_playlist_suggestions`, `create_smart_playlist`, `create_playlist`, `add_songs_to_playlist`, `get_my_playlists`, `get_playlist`, `authenticate`, `get_auth_status`, `clear_auth`
 
 ## Features
 
 - 🔍 **Search YouTube Music**: Find songs, artists, albums, and playlists
-- 🎵 **Smart Playlist Creation**: Generate playlists from natural language descriptions
+- 🎵 **Smart Playlist Creation**: Generate and save playlists from natural language descriptions
 - 🎨 **Intelligent Curation**: Create mood-based and decade-based playlists
-- 🔐 **Authentication Support**: Access library features with YouTube Music cookies
+- 💾 **Direct Playlist Saving**: Create actual playlists in your YouTube Music account
+- 📋 **Playlist Management**: View, modify, and organize your YouTube Music library
+- 🔐 **Full Authentication**: Complete access to your YouTube Music account features
 - 🧠 **AI-Powered**: Leverages YouTube Music APIs with intelligent recommendation algorithms
 
 ## Tools
@@ -22,15 +24,35 @@ Search YouTube Music for songs, artists, albums, or playlists
 - **Returns**: Formatted search results with titles, artists, durations, and IDs
 
 ### generate_playlist_suggestions
-Generate curated playlist suggestions based on mood or decade
-- **Parameters**: mood (energetic/chill/focus/party/workout/sleep), decade (1960-2020), durationMinutes, includeExplicit
-- **Returns**: Multiple playlist suggestions with reasoning and track lists
+Generate curated playlist suggestions based on mood or decade with optional auto-save
+- **Parameters**: mood (energetic/chill/focus/party/workout/sleep), decade (1960-2020), durationMinutes, includeExplicit, saveFirstSuggestion, privacy
+- **Returns**: Multiple playlist suggestions with reasoning and track lists, optionally saved to your account
 
 ### create_smart_playlist
-Create playlists from natural language descriptions
-- **Parameters**: description (string), targetLength (number, default 25)
-- **Returns**: Smart playlist with curated tracks matching the description
+Create playlists from natural language descriptions and save to your YouTube Music account
+- **Parameters**: description (string), targetLength (number, default 25), saveToAccount (boolean, default true), playlistTitle (optional), privacy
+- **Returns**: Smart playlist with curated tracks, automatically saved to your YouTube Music library
 - **Examples**: "Upbeat 80s workout music", "Chill study background music"
+
+### create_playlist
+Create a new playlist in your YouTube Music account
+- **Parameters**: title (string), description (optional), privacy (PUBLIC/PRIVATE/UNLISTED), songIds (optional array)
+- **Returns**: Created playlist with ID and URL, ready to access in your YouTube Music library
+
+### add_songs_to_playlist
+Add songs to an existing playlist in your YouTube Music account
+- **Parameters**: playlistId (string), songIds (array of video IDs)
+- **Returns**: Confirmation of songs added to the specified playlist
+
+### get_my_playlists
+List all playlists in your YouTube Music library
+- **Parameters**: none
+- **Returns**: Complete list of your playlists with titles, descriptions, track counts, and IDs
+
+### get_playlist
+Get detailed information about a specific playlist including all its songs
+- **Parameters**: playlistId (string), limit (number, default 100)
+- **Returns**: Playlist details and complete track listing with metadata
 
 ### authenticate
 Authenticate with YouTube Music using cookies

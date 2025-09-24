@@ -169,22 +169,84 @@ export class YouTubeMusicClient {
 
   async getPlaylist(request: GetPlaylistRequest): Promise<{ playlist: Playlist; songs: Song[] }> {
     this.ensureInitialized();
+    this.requireAuthentication();
 
     try {
-      // For now, use basic implementation
-      // In a full implementation, you'd use proper API calls to get playlist details
-      return {
-        playlist: {
-          id: request.playlistId,
-          title: `Playlist ${request.playlistId}`,
-          description: 'Playlist description not available',
-          trackCount: 0
-        },
-        songs: [] // Would need additional API calls to get songs
+      const playlistData = await this.ytmusicApi.getPlaylist(request.playlistId, request.limit);
+
+      const playlist: Playlist = {
+        id: playlistData.id,
+        title: playlistData.title,
+        description: playlistData.description,
+        trackCount: playlistData.trackCount,
+        author: playlistData.author,
+        thumbnails: playlistData.thumbnails
       };
+
+      const songs: Song[] = playlistData.tracks?.map((track: any): Song => ({
+        videoId: track.videoId,
+        title: track.title,
+        artists: track.artists?.map((artist: any) => ({ name: artist.name, id: artist.id })) || [],
+        album: track.album ? { name: track.album.name, id: track.album.id } : undefined,
+        duration: track.duration,
+        thumbnails: track.thumbnails,
+        isExplicit: track.isExplicit,
+        year: track.year
+      })) || [];
+
+      return { playlist, songs };
     } catch (error) {
       console.error('Failed to get playlist:', error);
       throw new Error(`Failed to get playlist: ${error}`);
+    }
+  }
+
+  async createPlaylist(title: string, description?: string, privacy: 'PUBLIC' | 'PRIVATE' | 'UNLISTED' = 'PRIVATE', songIds?: string[]): Promise<{ playlistId: string; url: string }> {
+    this.ensureInitialized();
+    this.requireAuthentication();
+
+    try {
+      // Create the playlist
+      const playlistId = await this.ytmusicApi.createPlaylist(title, description, privacy);
+
+      // Add songs if provided
+      if (songIds && songIds.length > 0) {
+        await this.ytmusicApi.addPlaylistItems(playlistId, songIds);
+      }
+
+      return {
+        playlistId,
+        url: `https://music.youtube.com/playlist?list=${playlistId}`
+      };
+    } catch (error) {
+      console.error('Failed to create playlist:', error);
+      throw new Error(`Failed to create playlist: ${error}`);
+    }
+  }
+
+  async addSongsToPlaylist(playlistId: string, songIds: string[]): Promise<void> {
+    this.ensureInitialized();
+    this.requireAuthentication();
+
+    try {
+      await this.ytmusicApi.addPlaylistItems(playlistId, songIds);
+    } catch (error) {
+      console.error('Failed to add songs to playlist:', error);
+      throw new Error(`Failed to add songs to playlist: ${error}`);
+    }
+  }
+
+  async removeSongsFromPlaylist(playlistId: string, songIds: string[]): Promise<void> {
+    this.ensureInitialized();
+    this.requireAuthentication();
+
+    try {
+      // Note: youtube-music-ts-api may require different parameters for removal
+      // This is a simplified implementation - may need adjustment based on API
+      await this.ytmusicApi.removePlaylistItems(playlistId, songIds);
+    } catch (error) {
+      console.error('Failed to remove songs from playlist:', error);
+      throw new Error(`Failed to remove songs from playlist: ${error}`);
     }
   }
 
