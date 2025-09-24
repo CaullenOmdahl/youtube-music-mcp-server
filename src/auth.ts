@@ -1,6 +1,6 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import { AuthConfigSchema, AuthConfig } from "./types.js";
+import { AuthConfig } from "./types.js";
 
 const AUTH_FILE_PATH = path.join(process.cwd(), 'auth.json');
 
@@ -15,7 +15,12 @@ export class AuthManager {
     try {
       if (await fs.pathExists(AUTH_FILE_PATH)) {
         const data = await fs.readJson(AUTH_FILE_PATH);
-        this.config = AuthConfigSchema.parse(data);
+        // Direct assignment instead of Zod parse
+        this.config = {
+          cookies: data.cookies,
+          headers: data.headers,
+          authenticated: data.authenticated ?? false
+        };
       }
     } catch (error) {
       console.warn('Failed to load authentication config:', error);
