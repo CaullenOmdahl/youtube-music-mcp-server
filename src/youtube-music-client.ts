@@ -1,5 +1,5 @@
 import YTMusic from "ytmusic-api";
-import YTMusicApiAuth from "youtube-music-ts-api";
+const YTMusicApiAuth = require("youtube-music-ts-api").default || require("youtube-music-ts-api");
 import { AuthManager } from "./auth.js";
 import { SearchResult, SearchToolRequest, Song, Playlist, GetPlaylistRequest } from "./types.js";
 
