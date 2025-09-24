@@ -670,3 +670,4 @@ function createMcpServer({
 
 // Export the MCP server creation function for Smithery
 export default createMcpServer;
+export const stateless = true;
