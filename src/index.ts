@@ -17,6 +17,13 @@ function createMcpServer({
 }: {
   config: Config
 }) {
+  // Debug: Log the config to see what we're receiving
+  console.log("MCP Server Config received:", {
+    hasCookies: !!config?.cookies,
+    cookiesLength: config?.cookies?.length || 0,
+    debug: config?.debug
+  });
+
   const server = new McpServer({
     name: "YouTube Music Manager",
     version: "1.0.0",
@@ -31,9 +38,14 @@ function createMcpServer({
   const ensureInitialized = async () => {
     if (!initialized) {
       try {
+        console.log("Initializing YouTube Music client...");
         await ytmusicClient.initialize();
+
         if (config?.cookies) {
+          console.log("Authenticating with cookies (length:", config.cookies.length, ")");
           await ytmusicClient.authenticate(config.cookies);
+        } else {
+          console.log("No cookies in config - running in unauthenticated mode");
         }
 
         if (config?.debug) {
