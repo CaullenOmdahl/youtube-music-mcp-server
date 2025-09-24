@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createStatelessServer } from "@smithery/sdk/server/stateless.js";
 import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
@@ -16,7 +17,7 @@ export const configSchema = z.object({
   cookies: z.string().optional().describe("YouTube Music cookies for authentication (required for full functionality)"),
 });
 
-export default function createServer({
+function createMcpServer({
   config,
 }: {
   config: z.infer<typeof configSchema>
@@ -30,9 +31,9 @@ export default function createServer({
   const ytmusicClient = new YouTubeMusicClient();
   const playlistCurator = new PlaylistCurator(ytmusicClient);
 
-  // Initialize the client on server start
+  // Lazy initialization helper - non-blocking
   let initialized = false;
-  const initializeClient = async () => {
+  const ensureInitialized = async () => {
     if (!initialized) {
       try {
         await ytmusicClient.initialize();
@@ -52,7 +53,7 @@ export default function createServer({
         initialized = true;
       } catch (error) {
         console.error("Failed to initialize YouTube Music client:", error);
-        // Don't throw - allow server to start even if auth fails
+        throw error; // Let tools handle the error appropriately
       }
     }
   };
@@ -66,9 +67,7 @@ export default function createServer({
       inputSchema: SearchToolRequestSchema,
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -79,6 +78,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const results = await ytmusicClient.search(args);
 
         let resultText = `Found results for "${args.query}":\n\n`;
@@ -126,6 +126,11 @@ export default function createServer({
           content: [{ type: "text", text: resultText }],
         };
       } catch (error) {
+        if (error.message && error.message.includes('Failed to initialize')) {
+          return {
+            content: [{ type: "text", text: `❌ **Initialization Error**\n\nFailed to initialize YouTube Music client. Please check your cookies and try again.\n\nError: ${error.message}` }],
+          };
+        }
         return {
           content: [{ type: "text", text: `Error searching YouTube Music: ${error}` }],
         };
@@ -149,9 +154,7 @@ export default function createServer({
       }),
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -162,6 +165,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const suggestions = await playlistCurator.generatePlaylistSuggestions(
           undefined,
           undefined,
@@ -258,9 +262,7 @@ export default function createServer({
       }),
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -271,6 +273,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const playlist = await playlistCurator.createSmartPlaylist(
           args.description,
           args.targetLength
@@ -413,9 +416,7 @@ export default function createServer({
       inputSchema: CreatePlaylistRequestSchema,
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -426,6 +427,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const result = await ytmusicClient.createPlaylist(
           args.title,
           args.description,
@@ -466,9 +468,7 @@ export default function createServer({
       inputSchema: AddSongsToPlaylistRequestSchema,
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -479,6 +479,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         await ytmusicClient.addSongsToPlaylist(args.playlistId, args.songIds);
 
         return {
@@ -504,9 +505,7 @@ export default function createServer({
       inputSchema: z.object({}),
     },
     async () => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -517,6 +516,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const playlists = await ytmusicClient.getLibraryPlaylists();
 
         if (playlists.length === 0) {
@@ -555,9 +555,7 @@ export default function createServer({
       inputSchema: GetPlaylistRequestSchema,
     },
     async (args) => {
-      await initializeClient();
-
-      // Check if cookies are configured
+      // Check if cookies are configured first
       if (!config.cookies || config.cookies.trim().length === 0) {
         return {
           content: [{
@@ -568,6 +566,7 @@ export default function createServer({
       }
 
       try {
+        await ensureInitialized();
         const { playlist, songs } = await ytmusicClient.getPlaylist(args);
 
         let resultText = `🎵 **${playlist.title}**\n\n`;
@@ -600,4 +599,12 @@ export default function createServer({
   );
 
   return server.server;
+}
+
+// Export the original function for compatibility
+export default createMcpServer;
+
+// Create the stateless server for Smithery deployment
+if (process.env.NODE_ENV !== 'test') {
+  createStatelessServer(createMcpServer).app.listen(process.env.PORT || 3000);
 }
