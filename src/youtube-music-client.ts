@@ -18,8 +18,14 @@ export class YouTubeMusicClient {
     try {
       await this.authManager.loadAuth();
 
-      // Initialize the search API (read-only)
-      await this.ytmusicSearch.initialize();
+      // Initialize the search API (read-only) with error handling
+      try {
+        await this.ytmusicSearch.initialize();
+        console.log('YouTube Music search API initialized');
+      } catch (searchError) {
+        console.warn('Failed to initialize search API:', searchError);
+        // Continue anyway - we can still work with authenticated API if available
+      }
 
       // Initialize the authenticated API if we have cookies
       if (this.authManager.isAuthenticated()) {
@@ -30,16 +36,17 @@ export class YouTubeMusicClient {
             await this.ytmusicApi.authenticate(cookies);
             console.log('YouTube Music authenticated API initialized');
           } catch (error) {
-            console.warn('Failed to initialize authenticated API, falling back to search-only:', error);
+            console.warn('Failed to initialize authenticated API:', error);
           }
         }
       }
 
       this.initialized = true;
-      console.log('YouTube Music client initialized successfully');
+      console.log('YouTube Music client initialized (may have limited functionality)');
     } catch (error) {
-      console.error('Failed to initialize YouTube Music client:', error);
-      throw new Error(`YouTube Music client initialization failed: ${error}`);
+      // Don't throw - allow server to start with limited functionality
+      console.warn('YouTube Music client initialization had issues:', error);
+      this.initialized = true; // Mark as initialized anyway
     }
   }
 
@@ -61,12 +68,32 @@ export class YouTubeMusicClient {
     try {
       const results: SearchResult = {};
 
-      // Use the search API for all searches
-      if (request.type === 'songs' || request.type === 'all') {
-        const songs = await this.ytmusicSearch.search(request.query);
+      // Try to use the search API, fall back to authenticated API if needed
+      let searchResults: any[] = [];
 
+      try {
+        // Use the search API for all searches
+        searchResults = await this.ytmusicSearch.search(request.query);
+      } catch (searchError) {
+        console.warn('Search API not available, trying authenticated API:', searchError);
+
+        // Try authenticated API as fallback
+        if (this.ytmusicApi && this.ytmusicApi.search) {
+          try {
+            searchResults = await this.ytmusicApi.search(request.query);
+          } catch (authSearchError) {
+            console.error('Both search APIs failed:', authSearchError);
+            throw new Error('YouTube Music search is currently unavailable. Please check your authentication or try again later.');
+          }
+        } else {
+          throw new Error('YouTube Music search is unavailable and no authenticated API is configured. Please ensure cookies are properly set.');
+        }
+      }
+
+      // Process search results
+      if (request.type === 'songs' || request.type === 'all') {
         // Filter to only songs and transform to our format
-        const songResults = songs
+        const songResults = searchResults
           .filter((item: any) => item.type === 'SONG')
           .slice(0, request.limit)
           .map((item: any): Song => ({
@@ -84,10 +111,8 @@ export class YouTubeMusicClient {
       }
 
       if (request.type === 'artists' || request.type === 'all') {
-        const artists = await this.ytmusicSearch.search(request.query);
-
         // Filter to only artists and transform
-        const artistResults = artists
+        const artistResults = searchResults
           .filter((item: any) => item.type === 'ARTIST')
           .slice(0, request.limit)
           .map((item: any) => ({
@@ -101,10 +126,8 @@ export class YouTubeMusicClient {
       }
 
       if (request.type === 'albums' || request.type === 'all') {
-        const albums = await this.ytmusicSearch.search(request.query);
-
         // Filter to only albums and transform
-        const albumResults = albums
+        const albumResults = searchResults
           .filter((item: any) => item.type === 'ALBUM')
           .slice(0, request.limit)
           .map((item: any) => ({
@@ -120,10 +143,8 @@ export class YouTubeMusicClient {
       }
 
       if (request.type === 'playlists' || request.type === 'all') {
-        const playlists = await this.ytmusicSearch.search(request.query);
-
         // Filter to only playlists and transform
-        const playlistResults = playlists
+        const playlistResults = searchResults
           .filter((item: any) => item.type === 'PLAYLIST')
           .slice(0, request.limit)
           .map((item: any): Playlist => ({
