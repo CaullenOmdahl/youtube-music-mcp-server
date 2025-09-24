@@ -400,13 +400,28 @@ function createMcpServer({
     },
     async () => {
       try {
-        // Simple test response for now
+        await ytmusicClient.initialize();
+        const status = ytmusicClient.getAuthStatus();
+
+        let statusText = "🔐 Authentication Status:\n\n";
+        statusText += `Authenticated: ${status.authenticated ? "✅ Yes" : "❌ No"}\n`;
+        statusText += `Has valid credentials: ${status.hasCredentials ? "✅ Yes" : "❌ No"}\n`;
+
+        if (!status.authenticated) {
+          statusText += "\n⚠️ You need to authenticate with YouTube Music cookies to use most features.";
+          statusText += "\n\nTo get your cookies:";
+          statusText += "\n1. Go to https://music.youtube.com and sign in";
+          statusText += "\n2. Open browser developer tools (F12)";
+          statusText += "\n3. Go to Application/Storage > Cookies";
+          statusText += "\n4. Copy all cookie values as a string";
+        }
+
         return {
-          content: [{ type: "text", text: "Authentication status: Not authenticated. This is a test response." }],
+          content: [{ type: "text", text: statusText }],
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error: ${error}` }],
+          content: [{ type: "text", text: `Error checking auth status: ${error}` }],
         };
       }
     }
