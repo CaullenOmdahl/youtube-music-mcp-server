@@ -1,0 +1,26 @@
+{
+	"name": "youtube-music-server",
+	"version": "1.0.0",
+	"description": "YouTube Music MCP Server - Search, curate, and manage YouTube Music playlists through Claude AI",
+	"main": "index.js",
+	"module": "./src/index.ts",
+	"type": "module",
+	"scripts": {
+		"dev": "npx @smithery/cli dev",
+		"build": "npx @smithery/cli build"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.17.4",
+		"fs-extra": "^11.3.2",
+		"youtube-music-ts-api": "^1.8.4",
+		"ytmusic-api": "^5.3.0",
+		"zod": "^3.25.46"
+	},
+	"devDependencies": {
+		"@smithery/cli": "^1.2.4",
+		"tsx": "^4.19.4"
+	}
+}

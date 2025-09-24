@@ -1,0 +1,14 @@
+runtime: typescript
+
+# User configuration for YouTube Music integration
+config:
+  debug:
+    type: boolean
+    default: false
+    description: "Enable debug logging for troubleshooting"
+
+  cookies:
+    type: string
+    required: false
+    description: "YouTube Music authentication cookies (get from music.youtube.com after logging in)"
+    sensitive: true
