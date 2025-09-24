@@ -1,11 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
 
-interface Config {
-  debug?: boolean;
-  cookies?: string;
-}
+// Export config schema for Smithery to use
+export const configSchema = z.object({
+  cookies: z.string().describe("YouTube Music cookies from music.youtube.com (required for all features)"),
+  debug: z.boolean().optional().default(false).describe("Enable debug logging"),
+});
+
+// Type for the config
+type Config = z.infer<typeof configSchema>;
 
 function createMcpServer({
   config,
