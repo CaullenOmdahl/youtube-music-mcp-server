@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "youtube-music-mcp"
+version = "1.0.0"
+description = "YouTube Music MCP Server - Search, manage playlists, and curate music"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.13.0",
+    "smithery>=0.1.23",
+    "ytmusicapi>=1.7.0",
+    "pydantic>=2.0.0"
+]
+
+[project.scripts]
+dev = "smithery.cli.dev:main"
+playground = "smithery.cli.playground:main"
+
+[tool.smithery]
+server = "ytmusic_server.server:create_server"
