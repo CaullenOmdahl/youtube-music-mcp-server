@@ -14,9 +14,9 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 
 ### Via Smithery (Recommended)
 
-TheThe easiest way to use this server is through [Smithery](https://smithery.ai/):
+The easiest way to use this server is through [Smithery](https://smithery.ai/):
 
-1. Visit the [YouTube Music MCP Server on Smithery](https://smithery.ai/server/youtube-music)
+1. Visit the [YouTube Music MCP Server on Smithery](https://smithery.ai/server/@CaullenOmdahl/youtube-music-mcp-server)
 2. Click "Install" to add it to your MCP client
 3. Configure your YouTube Music cookies (see [Getting Your Cookies](#getting-your-cookies))
 

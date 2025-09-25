@@ -1,0 +1,21 @@
+Search YouTube Music for songs, artists, albums, and playlists. Generate mood- or decade-based suggestions and create smart playlists from natural language descriptions. Authenticate to create and manage playlists in your own library.
+
+## Quick Setup (2 minutes)
+
+1. Go to music.youtube.com and sign in
+2. Press F12 → Console tab → Run: copy(document.cookie)
+3. Paste the result in youtube_music_cookies field below
+
+## Features
+• Search music without auth
+• Create/manage playlists (requires cookies)
+• Generate smart playlists from descriptions
+• Add/remove songs from playlists
+
+## Example Commands
+"Search for Beatles songs"
+"Create a workout playlist"
+"Add this song to my favorites"
+"Generate a chill study playlist with 30 songs"
+
+Cookies last ~2 weeks. Details: github.com/CaullenOmdahl/youtube-music-mcp-server
