@@ -1,6 +1,6 @@
 # YouTube Music Curator
 
-Search YouTube Music for songs, artists, albums, and playlists. Generate mood- or decade-based suggestions and create smart playlists from natural language descriptions. Authenticate to create and manage playlists in your own library.
+Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The AI assistant will handle playlist curation based on your descriptions.
 
 ## Quick Setup
 
@@ -38,7 +38,7 @@ That's it! You can now manage your YouTube Music library with natural language.
 - 🎶 Add/remove songs from playlists
 - 🗑️ Delete playlists
 - 🔒 Change playlist privacy settings
-- 🤖 Generate smart playlists from descriptions like "upbeat 90s workout music"
+- 🤖 AI curates playlists based on your descriptions
 
 ## Example Commands
 
@@ -47,7 +47,7 @@ Try these with Claude after setup:
 - "Search for the top songs by Taylor Swift"
 - "Create a playlist called 'Morning Coffee'"
 - "Add Bohemian Rhapsody to my Rock Classics playlist"
-- "Generate a playlist with 25 chill study songs"
+- "Create a playlist with 25 chill study songs"
 - "Show me all my playlists"
 - "Make my workout playlist public"
 

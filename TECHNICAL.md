@@ -105,29 +105,18 @@ The server uses the [ytmusicapi](https://github.com/sigma67/ytmusicapi) library,
 
 ## Key Implementation Details
 
-### 1. Smart Playlist Generation
+### 1. AI-Driven Playlist Creation
 
-The smart playlist feature combines search and curation:
+Instead of implementing "smart" features in the MCP server, the design philosophy is:
 
-```python
-def create_smart_playlist(description: str, title: str, song_count: int):
-    # 1. Parse natural language description
-    keywords = extract_keywords(description)
-    
-    # 2. Search for matching songs
-    all_results = []
-    for keyword in keywords:
-        results = yt.search(keyword, filter="songs")
-        all_results.extend(results)
-    
-    # 3. Score and rank results
-    scored_results = score_relevance(all_results, description)
-    
-    # 4. Create playlist with top songs
-    playlist_id = yt.create_playlist(title)
-    video_ids = [s["videoId"] for s in scored_results[:song_count]]
-    yt.add_playlist_items(playlist_id, video_ids)
-```
+1. **MCP server provides tools** - Simple, focused functions (search, create playlist, add songs)
+2. **AI assistant does the thinking** - Claude decides what to search for and which songs to add
+3. **Natural language stays with AI** - The AI interprets descriptions like "upbeat 90s rock"
+
+This separation of concerns means:
+- The MCP server remains simple and maintainable
+- The AI can leverage its full capabilities for music curation
+- Users get better results as AI models improve
 
 ### 2. Error Handling Strategy
 

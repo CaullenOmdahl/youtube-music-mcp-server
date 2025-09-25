@@ -7,7 +7,7 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 - 🔍 **Search** - Search for songs, albums, artists, playlists, and videos
 - 📋 **Playlist Management** - Create, edit, delete, and manage playlists
 - 🎵 **Library Access** - Access and modify your personal YouTube Music library
-- 🤖 **Smart Playlists** - Generate playlists from natural language descriptions
+
 - 🔐 **Secure Authentication** - Cookie-based authentication keeps your credentials safe
 
 ## Installation
@@ -159,14 +159,7 @@ Edit playlist metadata.
 edit_playlist(playlist_id, title?, description?, privacy?)
 ```
 
-### Create Smart Playlist
-Generate a playlist from natural language.
 
-```
-create_smart_playlist(description, title?, song_count?)
-```
-
-Example: "Create a playlist of upbeat 90s rock songs for working out"
 
 ## Usage Examples
 
@@ -177,7 +170,7 @@ Once configured, you can use natural language commands:
 - "Search for songs by The Beatles"
 - "Create a new playlist called 'Workout Mix'"
 - "Add the top 5 songs by Dua Lipa to my Summer Vibes playlist"
-- "Generate a playlist of relaxing jazz for studying"
+- "Create a playlist called 'Study Jazz' and add relaxing jazz songs"
 - "Show me all my playlists"
 - "Delete my old test playlist"
 

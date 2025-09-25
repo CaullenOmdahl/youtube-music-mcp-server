@@ -482,117 +482,9 @@ def create_server():
                 "message": f"Failed to edit playlist {playlist_id}"
             }
 
-    # === SMART FEATURES ===
-
-    @server.tool()
-    def create_smart_playlist(
-        description: str,
-        title: Optional[str] = None,
-        song_count: int = 25,
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Create a playlist based on a natural language description.
-
-        Args:
-            description: Natural language description (e.g., "upbeat 90s rock for working out")
-            title: Playlist title (generated from description if not provided)
-            song_count: Target number of songs (default 25)
-
-        Returns:
-            The created playlist with songs added
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
-            }
-
-        # Generate title from description if not provided
-        if not title:
-            title = description[:50] + "..." if len(description) > 50 else description
-
-        try:
-            # Parse description for search terms
-            search_terms = []
-
-            # Look for decade references
-            decades = {
-                "80s": "1980s", "eighties": "1980s",
-                "90s": "1990s", "nineties": "1990s",
-                "2000s": "2000s", "00s": "2000s",
-                "2010s": "2010s", "10s": "2010s"
-            }
-
-            # Look for mood/genre keywords
-            genres = ["rock", "pop", "hip hop", "electronic", "jazz", "classical", "country", "metal", "indie", "r&b"]
-            moods = ["upbeat", "chill", "energetic", "relaxing", "workout", "party", "focus", "sleep"]
-
-            description_lower = description.lower()
-
-            # Extract relevant search terms
-            for decade_key, decade_value in decades.items():
-                if decade_key in description_lower:
-                    search_terms.append(decade_value)
-
-            for genre in genres:
-                if genre in description_lower:
-                    search_terms.append(genre)
-
-            for mood in moods:
-                if mood in description_lower:
-                    search_terms.append(mood)
-
-            # If no specific terms found, use the description as is
-            if not search_terms:
-                search_terms = [description]
-
-            # Search for songs
-            search_query = " ".join(search_terms)
-            results = yt.ytmusic.search(search_query, filter="songs", limit=song_count)
-
-            if not results:
-                return {
-                    "success": False,
-                    "error": "No songs found",
-                    "message": f"Could not find songs matching: {description}"
-                }
-
-            # Create playlist
-            playlist_id = yt.ytmusic.create_playlist(
-                title=title,
-                description=f"Smart playlist: {description}",
-                privacy_status=ctx.session_config.default_privacy
-            )
-
-            # Add songs to playlist
-            video_ids = [song['videoId'] for song in results if 'videoId' in song]
-            if video_ids:
-                yt.ytmusic.add_playlist_items(playlist_id, video_ids)
-
-            return {
-                "success": True,
-                "playlist_id": playlist_id,
-                "title": title,
-                "songs_added": len(video_ids),
-                "message": f"Created smart playlist '{title}' with {len(video_ids)} songs"
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to create smart playlist: {description}"
-            }
+    # Note: Removed create_smart_playlist function
+    # The AI assistant should use the search and playlist management tools directly
+    # to build playlists based on user descriptions
 
     @server.tool()
     def get_auth_status(ctx: Context) -> Dict[str, Any]:
@@ -604,13 +496,23 @@ def create_server():
         """
         yt = get_ytmusic(ctx)
 
+        if not yt:
+            return {
+                "authenticated": False,
+                "capabilities": {
+                    "search": False,
+                    "playlist_management": False,
+                    "library_access": False
+                },
+                "message": "YouTube Music cookies not configured. Please add cookies in server settings."
+            }
+
         return {
             "authenticated": yt.authenticated,
             "capabilities": {
                 "search": True,  # Always available
                 "playlist_management": yt.authenticated,
-                "library_access": yt.authenticated,
-                "smart_playlists": yt.authenticated
+                "library_access": yt.authenticated
             },
             "message": "Authenticated and ready!" if yt.authenticated else "Limited to search only. Add cookies for full access."
         }
