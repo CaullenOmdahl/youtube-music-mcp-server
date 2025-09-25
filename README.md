@@ -1,109 +1,261 @@
-# YouTube Music MCP Server for Smithery
+# YouTube Music MCP Server
 
-A powerful MCP server that connects to YouTube Music, enabling search, playlist management, and music curation directly through Claude or any MCP client.
+A Model Context Protocol (MCP) server that enables AI assistants to interact with YouTube Music. Search for music, manage playlists, and control your YouTube Music library through natural language commands.
 
 ## Features
 
-- 🔍 **Search** - Find songs, artists, albums, playlists
-- 📚 **Library Management** - Access and manage your playlists
-- ➕ **Playlist Operations** - Create, edit, delete playlists
-- 🎵 **Song Management** - Add/remove songs from playlists
-- 🤖 **Smart Playlists** - Create playlists from natural language descriptions
-- 🔐 **Simple Authentication** - Just paste your cookies, no complex setup
+- 🔍 **Search** - Search for songs, albums, artists, playlists, and videos
+- 📋 **Playlist Management** - Create, edit, delete, and manage playlists
+- 🎵 **Library Access** - Access and modify your personal YouTube Music library
+- 🤖 **Smart Playlists** - Generate playlists from natural language descriptions
+- 🔐 **Secure Authentication** - Cookie-based authentication keeps your credentials safe
 
-## How to Get Your YouTube Music Cookies
+## Installation
 
-1. Go to [YouTube Music](https://music.youtube.com) and sign in
-2. Open Developer Tools (F12)
-3. Go to **Application** tab → **Cookies** → `https://music.youtube.com`
-4. Select all cookies (Ctrl+A) and copy them
-5. Format them as a single string separated by `; `
+### Via Smithery (Recommended)
 
-The cookie string should contain all cookies from music.youtube.com, including:
-- VISITOR_INFO1_LIVE
-- SID, HSID, SSID
-- APISID, SAPISID
+TheThe easiest way to use this server is through [Smithery](https://smithery.ai/):
+
+1. Visit the [YouTube Music MCP Server on Smithery](https://smithery.ai/server/youtube-music)
+2. Click "Install" to add it to your MCP client
+3. Configure your YouTube Music cookies (see [Getting Your Cookies](#getting-your-cookies))
+
+### Local Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/CaullenOmdahl/youtube-music-mcp-server.git
+cd youtube-music-server
+
+# Install dependencies
+pip install -e .
+
+# Run the server
+python -m ytmusic_server
+- 
+## Getting Your Cookies
+
+To use authenticated features (playlist management, library access), you need to provide your YouTube Music cookies. Here's how:
+
+### Method 1: Browser Developer Tools (Recommended)
+
+1. Open [YouTube Music](https://music.youtube.com) in your browser
+2. Sign in to your account
+3. Open Developer Tools (F12 or right-click → "Inspect")
+4. Go to the "Application" tab (Chrome/Edge) or "Storage" tab (Firefox)
+5. In the sidebar, expand "Cookies" and click on `https://music.youtube.com`
+6. Find and copy the values of these cookies:
+   - `VISITOR_INFO1_LIVE`
+   - `PREF`
+   - `LOGIN_INFO` 
+   - `SAPISID`
+   - `__Secure-3PAPISID`
+   - `__Secure-3PSID`
+   - `APISID`
+   - `HSID`
+   - `SID`
+   - `SSID`
+   - `SIDCC`
+   - `__Secure-3PSIDCC`
+   - `YSC`
+   - `SOCS`
+
+7. Format them as a cookie string:
+```
+VISITOR_INFO1_LIVE=xxxxx; PREF=xxxxx; LOGIN_INFO=xxxxx; SAPISID=xxxxx; ...
+```
+
+### Method 2: Browser Extension
+
+Use extensions like [EditThisCookie](https://www.editthiscookie.com/) or [Cookie-Editor](https://cookie-editor.cgagnier.ca/) to export cookies in the correct format.
+
+### Method 3: Using a Cookie Export Script
+
+```javascript
+// Run this in the browser console on music.youtube.com
+copy(document.cookie)
 - And other session cookies
 
 ## Configuration
 
-When connecting to this server, you'll need to provide:
+### For Smithery Users
 
-- **youtube_music_cookies** (required): Your YouTube Music cookies
-- **default_privacy** (optional): Default privacy for new playlists (PRIVATE, PUBLIC, or UNLISTED)
+After installing the server on Smithery, configure it with your cookies:
+
+1. Click on the server settings in your MCP client
+2. Paste your cookie string in the `youtube_music_cookies` field
+3. Optionally set `default_privacy` to `PRIVATE`, `PUBLIC`, or `UNLISTED`
+4. Save the configuration
+
+### For Local Installation
+
+Create a configuration file or set environment variables:
+
+```json
+{
+  "youtube_music_cookies": "YOUR_COOKIE_STRING_HERE",
+  "default_privacy": "PRIVATE"
+}
+```
 
 ## Available Tools
 
-### Search (No Auth Required)
-- `search_music` - Search YouTube Music for any content
+### Search Music
+Search YouTube Music for content without authentication.
 
-### Playlist Management (Auth Required)
-- `get_library_playlists` - Get all your playlists
-- `get_playlist` - Get detailed info about a specific playlist
-- `create_playlist` - Create a new playlist
-- `add_songs_to_playlist` - Add songs to a playlist
-- `remove_songs_from_playlist` - Remove songs from a playlist
-- `delete_playlist` - Delete a playlist
-- `edit_playlist` - Edit playlist title, description, or privacy
+```
+search_music(query, filter?, limit?)
+```
+- `query`: Search terms
+- `filter`: Optional - 'songs', 'videos', 'albums', 'artists', 'playlists', 'uploads'
+- `limit`: Maximum results (default: 20)
 
-### Smart Features
-- `create_smart_playlist` - Create a playlist from a description like "upbeat 90s workout music"
-- `get_auth_status` - Check your authentication status
+### Get Library Playlists
+Get all playlists from your library (requires auth).
+
+```
+get_library_playlists()
+```
+
+### Get Playlist
+Get detailed information about a specific playlist.
+
+```
+get_playlist(playlist_id)
+```
+
+### Create Playlist
+Create a new playlist in your library.
+
+```
+create_playlist(title, description?, privacy?)
+```
+
+### Add Songs to Playlist
+Add songs to an existing playlist.
+
+```
+add_songs_to_playlist(playlist_id, video_ids)
+```
+
+### Remove Songs from Playlist
+Remove songs from a playlist.
+
+```
+remove_songs_from_playlist(playlist_id, videos)
+```
+
+### Delete Playlist
+Delete a playlist from your library.
+
+```
+delete_playlist(playlist_id)
+```
+
+### Edit Playlist
+Edit playlist metadata.
+
+```
+edit_playlist(playlist_id, title?, description?, privacy?)
+```
+
+### Create Smart Playlist
+Generate a playlist from natural language.
+
+```
+create_smart_playlist(description, title?, song_count?)
+```
+
+Example: "Create a playlist of upbeat 90s rock songs for working out"
 
 ## Usage Examples
 
-### Search for Music
+### With Claude Desktop
+
+Once configured, you can use natural language commands:
+
+- "Search for songs by The Beatles"
+- "Create a new playlist called 'Workout Mix'"
+- "Add the top 5 songs by Dua Lipa to my Summer Vibes playlist"
+- "Generate a playlist of relaxing jazz for studying"
+- "Show me all my playlists"
+- "Delete my old test playlist"
+
+### With Python Client
+
+```python
+from mcp_client import MCPClient
+
+client = MCPClient("youtube-music-server")
+
+# Search for music
+results = client.call_tool("search_music", {
+    "query": "Bohemian Rhapsody",
+    "filter": "songs"
+})
+
+# Create a playlist
+playlist = client.call_tool("create_playlist", {
+    "title": "My Awesome Playlist",
+    "description": "Songs I love",
+    "privacy": "PRIVATE"
+})
+
+# Add songs to playlist
+client.call_tool("add_songs_to_playlist", {
+    "playlist_id": playlist["playlist_id"],
+    "video_ids": ["videoId1", "videoId2"]
+})
 ```
-Search for "The Beatles" songs on YouTube Music
-```
 
-### Create a Playlist
-```
-Create a playlist called "Summer Vibes 2025" with chill beach music
-```
+## Privacy & Security
 
-### Smart Playlist Creation
-```
-Create a smart playlist: "energetic 2000s pop punk for working out"
-```
+- **Cookie Security**: Your cookies are stored locally and never transmitted to third parties
+- **Session Isolation**: Each session has its own authentication context
+- **No Password Storage**: We never store or ask for your Google password
+- **Revocable Access**: You can revoke access anytime by signing out of YouTube Music
 
-## Local Development
+## Troubleshooting
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
-# or with uv
-uv sync
-```
+### "YouTube Music cookies not configured"
+- Ensure you've provided your cookie string in the configuration
+- Check that your cookies haven't expired (sign in to YouTube Music again)
+- Verify all required cookies are included
 
-2. Run the development server:
-```bash
-uv run dev
-# or test in playground
-uv run playground
-```
+### "Authentication required"
+- Some features require authentication even with cookies
+- Try refreshing your cookies from YouTube Music
 
-## Deployment on Smithery
+### Search works but playlists don't
+- Playlist operations require valid authentication cookies
+- Ensure you're signed in to YouTube Music in your browser
+- Check that your cookies include `SAPISID` and login tokens
 
-1. Push this code to a GitHub repository
-2. Go to [Smithery](https://smithery.ai/new)
-3. Connect your GitHub and deploy
-4. Users can configure their own cookies when connecting
+### Cookies expire frequently
+- YouTube Music cookies typically last 2 weeks
+- Sign in with "Remember me" checked for longer-lasting cookies
+- Update cookies when you see authentication errors
 
-## Security Notes
+## Contributing
 
-- Cookies are handled per-session (each user uses their own)
-- Never share your cookies publicly
-- Cookies expire after ~2 years or when you log out
-- The server only accesses YouTube Music, nothing else
-
-## Requirements
-
-- Python 3.10+
-- ytmusicapi
-- mcp
-- smithery
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT
+MIT License - See [LICENSE](LICENSE) file for details
+
+## Acknowledgments
+
+- Built with [ytmusicapi](https://github.com/sigma67/ytmusicapi) by sigma67
+- Implements the [Model Context Protocol](https://modelcontextprotocol.io/)
+- Deployable via [Smithery](https://smithery.ai/)
+
+## Support
+
+For issues, questions, or suggestions:
+- Open an issue on [GitHub](https://github.com/CaullenOmdahl/youtube-music-mcp-server/issues)
+- Check existing issues for solutions
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or connected to YouTube, YouTube Music, or Google. Use at your own risk and in accordance with YouTube's Terms of Service.
