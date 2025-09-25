@@ -24,7 +24,8 @@ DO:
 - Search for SPECIFIC songs by name and artist
 - Break down complex requests into individual searches
 - Handle curation and song selection yourself
-- Collect all video IDs before adding to playlist
+- Use video IDs immediately after searching (they can become stale)
+- If batch adding fails, try smaller batches or individual songs
 
 DON'T:
 - Don't pass descriptions to search (NOT "upbeat music" or "90s hits")
@@ -40,8 +41,9 @@ SEARCH EXAMPLES:
 
 ERROR HANDLING:
 - "YouTube Music cookies not configured" → Guide user through cookie setup
-- No search results → Try alternative search terms
-- Authentication errors → Explain that playlist operations need cookies
+- "401 Unauthorized" → Cookies have expired, user needs to refresh them
+- "400 Precondition check failed" → Video IDs are invalid/stale, search for fresh ones
+- No search results → Try alternative search terms (without featured artists, etc.)
 """
 
 from pydantic import BaseModel, Field
@@ -354,11 +356,19 @@ def create_server():
                 "message": f"Created playlist '{title}' with ID: {playlist_id}"
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to create playlist '{title}'"
-            }
+            error_str = str(e)
+            if "401" in error_str or "Unauthorized" in error_str:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": "Authentication expired. Please refresh your YouTube Music cookies from music.youtube.com"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": f"Failed to create playlist '{title}'"
+                }
 
     @server.tool()
     def add_songs_to_playlist(
@@ -404,11 +414,33 @@ def create_server():
                 "result": result
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to add songs to playlist {playlist_id}"
-            }
+            error_str = str(e)
+
+            # Provide helpful error messages for common failures
+            if "401" in error_str or "Unauthorized" in error_str:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": "Authentication expired. Please refresh your YouTube Music cookies."
+                }
+            elif "400" in error_str or "Precondition" in error_str:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": "Some video IDs may be invalid or outdated. Try searching for fresh IDs or adding songs individually."
+                }
+            elif "403" in error_str:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": "Permission denied. You may not have access to modify this playlist."
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": error_str,
+                    "message": f"Failed to add songs to playlist {playlist_id}"
+                }
 
     @server.tool()
     def remove_songs_from_playlist(
