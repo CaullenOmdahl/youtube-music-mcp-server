@@ -234,7 +234,7 @@ Once configured, you can:
 - "Remove duplicate songs from my playlist"
 - "Make my playlist public"
 
-### AI-Assisted Playlist Creation
+### Assistant-Curated Playlist Creation
 - "Create a playlist of songs similar to Radiohead and add 20 tracks"
 - "Make a chill Sunday morning playlist with 30 songs"
 - "Build a road trip playlist with classic rock hits"

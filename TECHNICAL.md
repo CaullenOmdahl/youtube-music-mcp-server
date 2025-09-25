@@ -2,11 +2,11 @@
 
 ## Architecture Overview
 
-This server implements the Model Context Protocol (MCP) to provide YouTube Music functionality to AI assistants. It acts as a bridge between AI models and the YouTube Music API, handling authentication, API calls, and data transformation.
+This server implements the Model Context Protocol (MCP) to provide YouTube Music functionality to LLMs. It acts as a bridge between language models and the YouTube Music API, handling authentication, API calls, and data transformation.
 
 ```
 ┌─────────────┐     MCP Protocol     ┌──────────────┐     HTTPS/API     ┌──────────────┐
-│ AI Assistant│◄──────────────────────►│  MCP Server  │◄─────────────────►│YouTube Music │
+│     LLM     │◄──────────────────────►│  MCP Server  │◄─────────────────►│YouTube Music │
 │  (Claude)   │    JSON-RPC 2.0       │  (This app)  │   ytmusicapi      │   Backend    │
 └─────────────┘                       └──────────────┘                   └──────────────┘
 ```
@@ -97,7 +97,7 @@ The server uses the [ytmusicapi](https://github.com/sigma67/ytmusicapi) library,
 
 ### Request Flow
 
-1. **Tool Invocation**: AI calls MCP tool with parameters
+1. **Tool Invocation**: LLM calls MCP tool with parameters
 2. **Session Retrieval**: Server gets/creates YTMusic instance for session
 3. **API Call**: YTMusic library makes authenticated HTTPS request
 4. **Response Processing**: Server transforms API response to MCP format
@@ -105,18 +105,18 @@ The server uses the [ytmusicapi](https://github.com/sigma67/ytmusicapi) library,
 
 ## Key Implementation Details
 
-### 1. AI-Driven Playlist Creation
+### 1. LLM-Driven Playlist Creation
 
 Instead of implementing "smart" features in the MCP server, the design philosophy is:
 
 1. **MCP server provides tools** - Simple, focused functions (search, create playlist, add songs)
-2. **AI assistant does the thinking** - Claude decides what to search for and which songs to add
-3. **Natural language stays with AI** - The AI interprets descriptions like "upbeat 90s rock"
+2. **LLM does the thinking** - The language model decides what to search for and which songs to add
+3. **Natural language stays with the LLM** - The LLM interprets descriptions like "upbeat 90s rock"
 
 This separation of concerns means:
 - The MCP server remains simple and maintainable
-- The AI can leverage its full capabilities for music curation
-- Users get better results as AI models improve
+- The LLM can leverage its full capabilities for music curation
+- Users get better results as language models improve
 
 ### 2. Error Handling Strategy
 

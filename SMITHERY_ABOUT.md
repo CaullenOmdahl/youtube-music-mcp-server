@@ -1,6 +1,6 @@
 # YouTube Music Curator
 
-Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The AI assistant will handle playlist curation based on your descriptions.
+Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The assistant will handle playlist curation based on your descriptions.
 
 ## Quick Setup
 
@@ -38,7 +38,7 @@ That's it! You can now manage your YouTube Music library with natural language.
 - 🎶 Add/remove songs from playlists
 - 🗑️ Delete playlists
 - 🔒 Change playlist privacy settings
-- 🤖 AI curates playlists based on your descriptions
+- 🤖 Assistant curates playlists based on your descriptions
 
 ## Example Commands
 
