@@ -3,26 +3,24 @@ import { z } from "zod";
 import { YouTubeMusicClient } from "./youtube-music-client.js";
 import { PlaylistCurator } from "./curation.js";
 
-// Export config schema for Smithery to use
+// Export config schema for Smithery to use - required for session config
 export const configSchema = z.object({
-  cookies: z.string().optional().describe("YouTube Music cookies from music.youtube.com (required for all features)"),
+  cookies: z.string().describe("YouTube Music cookies from music.youtube.com"),
   debug: z.boolean().optional().default(false).describe("Enable debug logging"),
 });
 
 // Type for the config
 type Config = z.infer<typeof configSchema>;
 
-function createMcpServer({
+// Export stateless flag for Smithery
+export const stateless = true;
+
+// Main server creation function - default export for Smithery
+export default function createMcpServer({
   config,
 }: {
-  config: Config
+  config?: Config
 }) {
-  // Debug: Log the config to see what we're receiving
-  console.log("MCP Server Config received:", {
-    hasCookies: !!config?.cookies,
-    cookiesLength: config?.cookies?.length || 0,
-    debug: config?.debug
-  });
 
   const server = new McpServer({
     name: "YouTube Music Manager",
@@ -38,18 +36,13 @@ function createMcpServer({
   const ensureInitialized = async () => {
     if (!initialized) {
       try {
-        console.log("Initializing YouTube Music client...");
         await ytmusicClient.initialize();
 
         if (config?.cookies) {
-          console.log("Authenticating with cookies (length:", config.cookies.length, ")");
           await ytmusicClient.authenticate(config.cookies);
-        } else {
-          console.log("No cookies in config - running in unauthenticated mode");
-        }
-
-        if (config?.debug) {
-          console.log("YouTube Music client initialized and authenticated successfully");
+          if (config?.debug) {
+            console.log("YouTube Music client initialized and authenticated");
+          }
         }
 
         initialized = true;
@@ -729,7 +722,3 @@ function createMcpServer({
 
   return server.server;
 }
-
-// Export the MCP server creation function for Smithery
-export default createMcpServer;
-export const stateless = true;
