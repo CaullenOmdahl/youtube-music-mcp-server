@@ -23,12 +23,12 @@ class ConfigSchema(BaseModel):
     """Configuration schema for YouTube Music authentication"""
 
     youtube_music_cookies: str = Field(
-        ...,
+        default="",
         description="Your YouTube Music cookies from the browser. Get them from music.youtube.com -> F12 -> Application -> Cookies -> Copy all cookies as a single string"
     )
 
     default_privacy: str = Field(
-        "PRIVATE",
+        default="PRIVATE",
         description="Default privacy for new playlists: PRIVATE, PUBLIC, or UNLISTED"
     )
 
@@ -106,20 +106,26 @@ def create_server():
     """Create and configure the YouTube Music MCP server"""
 
     server = FastMCP(
-        name="YouTube Music",
-        description="Search, manage playlists, and curate your YouTube Music library"
+        name="YouTube Music"
     )
 
     # Store YTMusic instances per session
     ytmusic_sessions: Dict[str, YouTubeMusicAPI] = {}
 
-    def get_ytmusic(ctx: Context) -> YouTubeMusicAPI:
+    def get_ytmusic(ctx: Context) -> Optional[YouTubeMusicAPI]:
         """Get or create YTMusic instance for this session"""
-        session_id = id(ctx.session_config)
+        session_id = id(ctx.session_config) if ctx and ctx.session_config else "default"
 
         if session_id not in ytmusic_sessions:
+            # Check if cookies are provided
+            cookies = ctx.session_config.youtube_music_cookies if ctx and ctx.session_config else ""
+
+            if not cookies:
+                # Return None to indicate no cookies configured
+                return None
+
             # Create new instance with session's cookies
-            yt = YouTubeMusicAPI(ctx.session_config.youtube_music_cookies)
+            yt = YouTubeMusicAPI(cookies)
             yt.setup_from_cookies()
             ytmusic_sessions[session_id] = yt
 
@@ -146,6 +152,12 @@ def create_server():
             Search results from YouTube Music
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         try:
             results = yt.ytmusic.search(query, filter=filter, limit=limit)
@@ -172,6 +184,12 @@ def create_server():
             List of your playlists with IDs and metadata
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -206,6 +224,12 @@ def create_server():
             Detailed playlist information including all tracks
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         try:
             playlist = yt.ytmusic.get_playlist(playlist_id)
@@ -239,6 +263,12 @@ def create_server():
             The ID of the created playlist
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -285,6 +315,12 @@ def create_server():
             Status of the operation
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -324,6 +360,12 @@ def create_server():
             Status of the operation
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -358,6 +400,12 @@ def create_server():
             Status of the deletion
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -401,6 +449,12 @@ def create_server():
             Status of the edit operation
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
@@ -449,6 +503,12 @@ def create_server():
             The created playlist with songs added
         """
         yt = get_ytmusic(ctx)
+        if not yt:
+            return {
+                "success": False,
+                "error": "YouTube Music cookies not configured",
+                "message": "Please configure your YouTube Music cookies in the server settings"
+            }
 
         if not yt.authenticated:
             return {
