@@ -234,10 +234,10 @@ Once configured, you can:
 - "Remove duplicate songs from my playlist"
 - "Make my playlist public"
 
-### Smart Features
-- "Generate a playlist of songs similar to Radiohead"
-- "Create a chill Sunday morning playlist with 30 songs"
-- "Build a road trip playlist with classic rock"
+### AI-Assisted Playlist Creation
+- "Create a playlist of songs similar to Radiohead and add 20 tracks"
+- "Make a chill Sunday morning playlist with 30 songs"
+- "Build a road trip playlist with classic rock hits"
 
 ## Advanced Configuration
 
