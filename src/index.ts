@@ -5,7 +5,7 @@ import { PlaylistCurator } from "./curation.js";
 
 // Export config schema for Smithery to use - required for session config
 export const configSchema = z.object({
-  cookies: z.string().describe("YouTube Music cookies from music.youtube.com"),
+  cookies: z.string().optional().describe("YouTube Music cookies from music.youtube.com"),
   debug: z.boolean().optional().default(false).describe("Enable debug logging"),
 });
 
@@ -20,8 +20,8 @@ export default function createMcpServer({
   config,
 }: {
   config?: Config
-}) {
-
+} = {}) {
+  // Create server with error handling
   const server = new McpServer({
     name: "YouTube Music Manager",
     version: "1.0.0",
