@@ -1,4 +1,4 @@
-Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The AI assistant will handle playlist curation based on your descriptions.
+Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The assistant will handle playlist curation based on your descriptions.
 
 ## Quick Setup (2 minutes)
 
@@ -9,7 +9,7 @@ Search YouTube Music for songs, artists, albums, and playlists. Authenticate wit
 ## Features
 • Search music without auth
 • Create/manage playlists (requires cookies)
-• AI-assisted playlist creation from your descriptions
+• Assistant-curated playlist creation from your descriptions
 • Add/remove songs from playlists
 
 ## Example Commands

@@ -1,6 +1,47 @@
 """
 YouTube Music MCP Server with Cookie Authentication
 Deployable on Smithery with per-session configuration
+
+IMPORTANT INSTRUCTIONS FOR ASSISTANTS:
+=======================================
+
+This MCP server provides TOOLS, not intelligence. You (the assistant) must handle all the thinking and decision-making.
+
+CORE PRINCIPLE:
+- The server executes specific commands (search for "Song X", create playlist "Y", add video IDs)
+- You interpret user requests and decide what specific actions to take
+- You research/determine what songs to search for based on descriptions
+
+WORKFLOW FOR PLAYLIST CREATION:
+1. User request: "Create a playlist of 90s rock hits"
+2. You decide: What specific 90s rock songs to include
+3. You execute:
+   - create_playlist() to make the playlist
+   - search_music() for each specific song (e.g., "Smells Like Teen Spirit Nirvana")
+   - add_songs_to_playlist() with the collected video IDs
+
+DO:
+- Search for SPECIFIC songs by name and artist
+- Break down complex requests into individual searches
+- Handle curation and song selection yourself
+- Collect all video IDs before adding to playlist
+
+DON'T:
+- Don't pass descriptions to search (NOT "upbeat music" or "90s hits")
+- Don't expect the server to understand genres, moods, or decades
+- Don't pass long descriptions to any tool
+- Don't expect the server to make musical decisions
+
+SEARCH EXAMPLES:
+✅ GOOD: search_music("Bohemian Rhapsody Queen")
+✅ GOOD: search_music("Shape of You Ed Sheeran")
+❌ BAD: search_music("popular songs from 2020")
+❌ BAD: search_music("workout music")
+
+ERROR HANDLING:
+- "YouTube Music cookies not configured" → Guide user through cookie setup
+- No search results → Try alternative search terms
+- Authentication errors → Explain that playlist operations need cookies
 """
 
 from pydantic import BaseModel, Field
@@ -103,7 +144,16 @@ x-origin: https://music.youtube.com"""
 
 @smithery.server(config_schema=ConfigSchema)
 def create_server():
-    """Create and configure the YouTube Music MCP server"""
+    """
+    YouTube Music MCP Server - Simple tools for YouTube Music operations.
+
+    IMPORTANT: This server provides tools, not intelligence. The assistant must:
+    - Interpret user requests (e.g., "90s rock playlist")
+    - Decide what specific songs to search for
+    - Execute the tools in sequence (create → search → add)
+
+    See module docstring for detailed usage instructions.
+    """
 
     server = FastMCP(
         name="YouTube Music"
@@ -141,15 +191,22 @@ def create_server():
         ctx: Context = None
     ) -> Dict[str, Any]:
         """
-        Search YouTube Music for songs, artists, albums, or playlists.
+        Search YouTube Music for SPECIFIC songs, artists, albums, or playlists.
+
+        IMPORTANT: Search for exact names, not descriptions or genres.
+        Examples:
+        - ✅ "Blinding Lights The Weeknd"
+        - ✅ "Abbey Road Beatles album"
+        - ❌ "popular songs"
+        - ❌ "workout music"
 
         Args:
-            query: Search query
+            query: Specific song/artist/album name to search for
             filter: Optional filter - 'songs', 'videos', 'albums', 'artists', 'playlists', 'uploads'
             limit: Maximum results to return (default 20)
 
         Returns:
-            Search results from YouTube Music
+            Search results with videoId for each result (use these IDs with add_songs_to_playlist)
         """
         yt = get_ytmusic(ctx)
         if not yt:
@@ -252,15 +309,20 @@ def create_server():
         ctx: Context = None
     ) -> Dict[str, Any]:
         """
-        Create a new playlist in your YouTube Music library.
+        Create a new empty playlist in your YouTube Music library.
+
+        NOTE: This creates an EMPTY playlist. You must:
+        1. Create the playlist first (returns playlist_id)
+        2. Search for specific songs to add
+        3. Use add_songs_to_playlist() with the video IDs
 
         Args:
             title: Name of the playlist
-            description: Optional description
+            description: Optional description (brief text, not a list of songs)
             privacy: Privacy setting - PRIVATE, PUBLIC, or UNLISTED (uses default from config if not specified)
 
         Returns:
-            The ID of the created playlist
+            The playlist_id to use with add_songs_to_playlist()
         """
         yt = get_ytmusic(ctx)
         if not yt:
@@ -305,11 +367,16 @@ def create_server():
         ctx: Context = None
     ) -> Dict[str, Any]:
         """
-        Add songs to an existing playlist.
+        Add specific songs to an existing playlist using their video IDs.
+
+        WORKFLOW:
+        1. Get video IDs from search_music() results
+        2. Collect all IDs you want to add
+        3. Call this once with all IDs (more efficient than multiple calls)
 
         Args:
-            playlist_id: The playlist ID to add songs to
-            video_ids: List of YouTube video IDs to add
+            playlist_id: The playlist ID from create_playlist()
+            video_ids: List of video IDs from search_music() results
 
         Returns:
             Status of the operation
