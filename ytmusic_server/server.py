@@ -597,3 +597,7 @@ def create_server():
         }
 
     return server
+
+
+# Create the server instance for uvicorn
+app = create_server()
