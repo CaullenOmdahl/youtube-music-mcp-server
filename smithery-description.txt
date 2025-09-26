@@ -1,5 +1,25 @@
 Search YouTube Music for songs, artists, albums, and playlists. Authenticate with your cookies to create and manage playlists in your own library. The assistant will handle playlist curation based on your descriptions.
 
+## Getting Request Headers
+
+To enable full features (creating/managing playlists), you need to provide request headers from YouTube Music:
+
+### Chrome/Edge:
+1. Go to music.youtube.com and sign in
+2. Press F12 → Network tab
+3. Click around in YouTube Music (play a song, browse)
+4. Find any POST request to `/youtubei/v1/`
+5. Click the request → Headers panel → Raw view
+6. Copy ALL headers from `:authority:` to the last line
+
+### Firefox:
+1. Go to music.youtube.com and sign in
+2. Press F12 → Network tab
+3. Find a POST request
+4. Right-click → Copy → Copy Request Headers
+
+The headers should include cookies, authorization tokens, and client info.
+
 ## Quick Setup (2 minutes)
 
 1. Go to music.youtube.com and sign in
