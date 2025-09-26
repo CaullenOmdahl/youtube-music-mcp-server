@@ -1,34 +1,44 @@
-# Dockerfile for YouTube Music MCP Server
-# This custom Dockerfile fixes the Smithery auto-generated Dockerfile syntax error
+# Custom Dockerfile for YouTube Music MCP Server
+# Overrides Smithery's auto-generated Dockerfile
 
-FROM python:3.12-slim-bookworm
+FROM ghcr.io/astral-sh/uv:python3.12-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Set environment variables for Python
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+# Enable bytecode compilation for better performance
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies if needed
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
-# Copy project files
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+# Install dependencies using uv with the lock file
+RUN uv sync --frozen --no-install-project --no-dev
 
-# Upgrade pip and install the package
-RUN pip install --upgrade pip && \
-    pip install -e .
+# Copy the rest of the application
+COPY . .
 
-# Expose port if needed (Smithery handles this)
-# EXPOSE 8000
+# Install the project itself
+RUN uv sync --frozen --no-dev
 
-# The entry point is handled by Smithery configuration
-# The server will be started using the smithery.yaml configuration
+# Final stage - use a slim image
+FROM python:3.12-alpine
+
+WORKDIR /app
+
+# Copy the virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/pyproject.toml /app/pyproject.toml
+
+# Set environment to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/app/.venv
+
+# The entry point will be handled by Smithery
+ENTRYPOINT []
 CMD ["python", "-m", "ytmusic_server.server"]
