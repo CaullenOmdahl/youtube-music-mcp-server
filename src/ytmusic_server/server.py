@@ -1,5 +1,5 @@
 """
-YouTube Music MCP Server with Cookie Authentication
+YouTube Music MCP Server with Header-Based Authentication
 Deployable on Smithery with per-session configuration
 
 IMPORTANT INSTRUCTIONS FOR ASSISTANTS:
@@ -40,8 +40,8 @@ SEARCH EXAMPLES:
 ❌ BAD: search_music("workout music")
 
 ERROR HANDLING:
-- "YouTube Music cookies not configured" → Guide user through cookie setup
-- "401 Unauthorized" → Cookies have expired, user needs to refresh them
+- "YouTube Music headers not configured" → Guide user through header setup
+- "401 Unauthorized" → Headers have expired, user needs to refresh them
 - "400 Precondition check failed" → Video IDs are invalid/stale, search for fresh ones
 - No search results → Try alternative search terms (without featured artists, etc.)
 """
@@ -65,9 +65,9 @@ logger = logging.getLogger(__name__)
 class ConfigSchema(BaseModel):
     """Configuration schema for YouTube Music authentication"""
 
-    youtube_music_cookies: str = Field(
+    youtube_music_headers: str = Field(
         default="",
-        description="Your YouTube Music cookies from the browser. Get them from music.youtube.com -> F12 -> Application -> Cookies -> Copy all cookies as a single string"
+        description="Full request headers from music.youtube.com browser session. Go to music.youtube.com -> F12 -> Network tab -> Find any POST request to music.youtube.com -> Right-click -> Copy -> Copy request headers"
     )
 
     default_privacy: str = Field(
@@ -77,63 +77,42 @@ class ConfigSchema(BaseModel):
 
 
 class YouTubeMusicAPI:
-    """Wrapper for YouTube Music API with cookie-based auth"""
+    """Wrapper for YouTube Music API with header-based auth"""
 
-    def __init__(self, cookie_string: str):
-        """Initialize with cookie string"""
-        self.cookie_string = cookie_string
+    def __init__(self, headers_raw: str):
+        """Initialize with raw headers string"""
+        self.headers_raw = headers_raw
         self.ytmusic = None
         self.authenticated = False
 
-    def setup_from_cookies(self) -> bool:
-        """Setup authentication from cookie string"""
+    def setup_from_headers(self) -> bool:
+        """Setup authentication from raw headers string"""
         try:
-            # Extract required values from cookies
-            cookies_dict = {}
-            for cookie in self.cookie_string.split('; '):
-                if '=' in cookie:
-                    key, value = cookie.split('=', 1)
-                    cookies_dict[key] = value
-
-            # Check for required cookies
-            if 'SAPISID' not in cookies_dict:
-                logger.error("Missing SAPISID cookie required for authentication")
+            if not self.headers_raw.strip():
+                logger.error("No headers provided")
                 return False
 
-            # Generate authorization header
-            sapisid = cookies_dict['SAPISID']
-            timestamp = str(int(time.time()))
-            origin = "https://music.youtube.com"
-            hash_input = f"{timestamp} {sapisid} {origin}"
-            hash_output = hashlib.sha1(hash_input.encode()).hexdigest()
-            auth = f"SAPISIDHASH {timestamp}_{hash_output}"
+            # Validate headers contain required elements
+            headers_lower = self.headers_raw.lower()
+            if 'cookie:' not in headers_lower:
+                logger.error("Headers missing cookie information")
+                return False
 
-            # Generate visitor ID
-            visitor_id = ""
-            if 'VISITOR_INFO1_LIVE' in cookies_dict:
-                visitor_data = f"Cgt{cookies_dict['VISITOR_INFO1_LIVE']}".encode()
-                visitor_id = base64.b64encode(visitor_data).decode()
+            # Check for common header format indicators
+            if not any(h in headers_lower for h in ['accept:', 'user-agent:', 'referer:']):
+                logger.error("Headers don't appear to be in the correct format. Make sure to copy the full request headers.")
+                return False
 
-            # Construct headers
-            headers_raw = f"""accept: */*
-accept-language: en-US,en;q=0.9
-authorization: {auth}
-content-type: application/json
-cookie: {self.cookie_string}
-origin: https://music.youtube.com
-referer: https://music.youtube.com/
-user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-x-goog-authuser: 0
-x-goog-visitor-id: {visitor_id}
-x-origin: https://music.youtube.com"""
+            if 'music.youtube.com' not in self.headers_raw:
+                logger.warning("Headers don't appear to be from music.youtube.com")
 
-            # Setup ytmusicapi
-            auth_dict = setup(headers_raw=headers_raw)
+            # Setup ytmusicapi using the provided headers directly
+            auth_dict = setup(headers_raw=self.headers_raw)
 
             # Initialize YTMusic with auth
             self.ytmusic = YTMusic(auth_dict)
             self.authenticated = True
-            logger.info("Successfully authenticated with YouTube Music")
+            logger.info("Successfully authenticated with YouTube Music using provided headers")
             return True
 
         except Exception as e:
@@ -148,6 +127,7 @@ x-origin: https://music.youtube.com"""
 def create_server():
     """
     YouTube Music MCP Server - Simple tools for YouTube Music operations.
+    Uses header-based authentication from browser request headers.
 
     IMPORTANT: This server provides tools, not intelligence. The assistant must:
     - Interpret user requests (e.g., "90s rock playlist")
@@ -169,16 +149,16 @@ def create_server():
         session_id = id(ctx.session_config) if ctx and ctx.session_config else "default"
 
         if session_id not in ytmusic_sessions:
-            # Check if cookies are provided
-            cookies = ctx.session_config.youtube_music_cookies if ctx and ctx.session_config else ""
+            # Check if headers are provided
+            headers = ctx.session_config.youtube_music_headers if ctx and ctx.session_config else ""
 
-            if not cookies:
-                # Return None to indicate no cookies configured
+            if not headers:
+                # Return None to indicate no headers configured
                 return None
 
-            # Create new instance with session's cookies
-            yt = YouTubeMusicAPI(cookies)
-            yt.setup_from_cookies()
+            # Create new instance with session's headers
+            yt = YouTubeMusicAPI(headers)
+            yt.setup_from_headers()
             ytmusic_sessions[session_id] = yt
 
         return ytmusic_sessions[session_id]
@@ -214,8 +194,8 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         try:
@@ -246,15 +226,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         try:
@@ -286,8 +266,8 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         try:
@@ -330,15 +310,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         # Use privacy from params or fall back to config default
@@ -361,7 +341,7 @@ def create_server():
                 return {
                     "success": False,
                     "error": error_str,
-                    "message": "Authentication expired. Please refresh your YouTube Music cookies from music.youtube.com"
+                    "message": "Authentication expired. Please refresh your YouTube Music headers from music.youtube.com"
                 }
             else:
                 return {
@@ -395,15 +375,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         try:
@@ -421,7 +401,7 @@ def create_server():
                 return {
                     "success": False,
                     "error": error_str,
-                    "message": "Authentication expired. Please refresh your YouTube Music cookies."
+                    "message": "Authentication expired. Please refresh your YouTube Music headers."
                 }
             elif "400" in error_str or "Precondition" in error_str:
                 return {
@@ -462,15 +442,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         try:
@@ -502,15 +482,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         try:
@@ -551,15 +531,15 @@ def create_server():
         if not yt:
             return {
                 "success": False,
-                "error": "YouTube Music cookies not configured",
-                "message": "Please configure your YouTube Music cookies in the server settings"
+                "error": "YouTube Music headers not configured",
+                "message": "Please configure your YouTube Music headers in the server settings"
             }
 
         if not yt.authenticated:
             return {
                 "success": False,
                 "error": "Authentication required",
-                "message": "Please provide YouTube Music cookies in the configuration"
+                "message": "Please provide YouTube Music headers in the configuration"
             }
 
         try:
@@ -603,7 +583,7 @@ def create_server():
                     "playlist_management": False,
                     "library_access": False
                 },
-                "message": "YouTube Music cookies not configured. Please add cookies in server settings."
+                "message": "YouTube Music headers not configured. Please add headers in server settings."
             }
 
         return {
@@ -613,7 +593,7 @@ def create_server():
                 "playlist_management": yt.authenticated,
                 "library_access": yt.authenticated
             },
-            "message": "Authenticated and ready!" if yt.authenticated else "Limited to search only. Add cookies for full access."
+            "message": "Authenticated and ready!" if yt.authenticated else "Limited to search only. Add headers for full access."
         }
 
     return server

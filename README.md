@@ -8,7 +8,7 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 - 📋 **Playlist Management** - Create, edit, delete, and manage playlists
 - 🎵 **Library Access** - Access and modify your personal YouTube Music library
 
-- 🔐 **Secure Authentication** - Cookie-based authentication keeps your credentials safe
+- 🔐 **Secure Authentication** - Header-based authentication keeps your credentials safe
 
 ## Installation
 
@@ -18,7 +18,7 @@ The easiest way to use this server is through [Smithery](https://smithery.ai/):
 
 1. Visit the [YouTube Music MCP Server on Smithery](https://smithery.ai/server/@CaullenOmdahl/youtube-music-mcp-server)
 2. Click "Install" to add it to your MCP client
-3. Configure your YouTube Music cookies (see [Getting Your Cookies](#getting-your-cookies))
+3. Configure your YouTube Music headers (see [Getting Your Headers](#getting-your-headers))
 
 ### Local Installation
 
@@ -33,57 +33,56 @@ pip install -e .
 # Run the server
 python -m ytmusic_server
 - 
-## Getting Your Cookies
+## Getting Your Headers
 
-To use authenticated features (playlist management, library access), you need to provide your YouTube Music cookies. Here's how:
+To use authenticated features (playlist management, library access), you need to provide your YouTube Music request headers. Here's how:
 
-### Method 1: Browser Developer Tools (Recommended)
+### Browser Developer Tools Method (Required)
 
+**Step 1: Open YouTube Music and Developer Tools**
 1. Open [YouTube Music](https://music.youtube.com) in your browser
 2. Sign in to your account
 3. Open Developer Tools (F12 or right-click → "Inspect")
-4. Go to the "Application" tab (Chrome/Edge) or "Storage" tab (Firefox)
-5. In the sidebar, expand "Cookies" and click on `https://music.youtube.com`
-6. Find and copy the values of these cookies:
-   - `VISITOR_INFO1_LIVE`
-   - `PREF`
-   - `LOGIN_INFO` 
-   - `SAPISID`
-   - `__Secure-3PAPISID`
-   - `__Secure-3PSID`
-   - `APISID`
-   - `HSID`
-   - `SID`
-   - `SSID`
-   - `SIDCC`
-   - `__Secure-3PSIDCC`
-   - `YSC`
-   - `SOCS`
 
-7. Format them as a cookie string:
+**Step 2: Capture Request Headers**
+
+**For Firefox:**
+1. Click the "Network" tab in Developer Tools
+2. Perform any action on YouTube Music (click a playlist, search, etc.)
+3. Look for a POST request with "Status 200" and domain "music.youtube.com"
+4. Right-click on the request → "Copy" → "Copy Request Headers"
+
+**For Chrome/Chromium/Edge:**
+1. Click the "Network" tab in Developer Tools
+2. Perform any action on YouTube Music (click a playlist, search, etc.)
+3. Look for a request named "browse?" or similar POST request to music.youtube.com
+4. Click on the request name
+5. In the "Headers" tab, scroll to "Request Headers"
+6. Copy everything from `accept: */*` to the end of the headers section
+
+**Important:** The headers should look like this:
 ```
-VISITOR_INFO1_LIVE=xxxxx; PREF=xxxxx; LOGIN_INFO=xxxxx; SAPISID=xxxxx; ...
+accept: */*
+accept-encoding: gzip, deflate, br
+accept-language: en-US,en;q=0.9
+authorization: SAPISIDHASH 1234567890_abcdef...
+cookie: VISITOR_INFO1_LIVE=abc123; PREF=tz=...; ...
+origin: https://music.youtube.com
+referer: https://music.youtube.com/
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...
+x-goog-authuser: 0
+x-goog-visitor-id: Cgtabc123def456
+x-origin: https://music.youtube.com
 ```
-
-### Method 2: Browser Extension
-
-Use extensions like [EditThisCookie](https://www.editthiscookie.com/) or [Cookie-Editor](https://cookie-editor.cgagnier.ca/) to export cookies in the correct format.
-
-### Method 3: Using a Cookie Export Script
-
-```javascript
-// Run this in the browser console on music.youtube.com
-copy(document.cookie)
-- And other session cookies
 
 ## Configuration
 
 ### For Smithery Users
 
-After installing the server on Smithery, configure it with your cookies:
+After installing the server on Smithery, configure it with your headers:
 
 1. Click on the server settings in your MCP client
-2. Paste your cookie string in the `youtube_music_cookies` field
+2. Paste your complete request headers in the `youtube_music_headers` field
 3. Optionally set `default_privacy` to `PRIVATE`, `PUBLIC`, or `UNLISTED`
 4. Save the configuration
 
@@ -93,7 +92,7 @@ Create a configuration file or set environment variables:
 
 ```json
 {
-  "youtube_music_cookies": "YOUR_COOKIE_STRING_HERE",
+  "youtube_music_headers": "YOUR_COMPLETE_HEADERS_HERE",
   "default_privacy": "PRIVATE"
 }
 ```
@@ -203,31 +202,31 @@ client.call_tool("add_songs_to_playlist", {
 
 ## Privacy & Security
 
-- **Cookie Security**: Your cookies are stored locally and never transmitted to third parties
+- **Header Security**: Your headers are stored locally and never transmitted to third parties
 - **Session Isolation**: Each session has its own authentication context
 - **No Password Storage**: We never store or ask for your Google password
 - **Revocable Access**: You can revoke access anytime by signing out of YouTube Music
 
 ## Troubleshooting
 
-### "YouTube Music cookies not configured"
-- Ensure you've provided your cookie string in the configuration
-- Check that your cookies haven't expired (sign in to YouTube Music again)
-- Verify all required cookies are included
+### "YouTube Music headers not configured"
+- Ensure you've provided your complete request headers in the configuration
+- Check that your headers haven't expired (sign in to YouTube Music again)
+- Verify headers include cookie information and authorization data
 
 ### "Authentication required"
-- Some features require authentication even with cookies
-- Try refreshing your cookies from YouTube Music
+- Some features require authentication even with headers
+- Try refreshing your headers from YouTube Music
 
 ### Search works but playlists don't
-- Playlist operations require valid authentication cookies
+- Playlist operations require valid authentication headers
 - Ensure you're signed in to YouTube Music in your browser
-- Check that your cookies include `SAPISID` and login tokens
+- Check that your headers include complete cookie and authorization information
 
-### Cookies expire frequently
-- YouTube Music cookies typically last 2 weeks
-- Sign in with "Remember me" checked for longer-lasting cookies
-- Update cookies when you see authentication errors
+### Headers expire frequently
+- YouTube Music headers typically last 2 weeks
+- Sign in with "Remember me" checked for longer-lasting sessions
+- Update headers when you see authentication errors
 
 ## Contributing
 
