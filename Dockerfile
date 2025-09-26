@@ -13,14 +13,14 @@ COPY ytmusic_server ./ytmusic_server
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir . && \
-    pip install --no-cache-dir uvicorn
+    pip install --no-cache-dir .
 
-# Set environment variable for port
+# Set environment variable for port (Smithery expects 8081)
 ENV PORT=8081
+ENV SMITHERY_PORT=8081
 
 # Expose the port
 EXPOSE 8081
 
-# Run the server
-CMD ["python", "-m", "uvicorn", "ytmusic_server.server:app", "--host", "0.0.0.0", "--port", "8081"]
+# Run the server using smithery CLI which properly handles the FastMCP server
+CMD ["python", "-m", "smithery.cli.dev", "--port", "8081", "--host", "0.0.0.0"]

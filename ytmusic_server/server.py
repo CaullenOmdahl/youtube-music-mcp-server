@@ -599,5 +599,9 @@ def create_server():
     return server
 
 
-# Create the server instance for uvicorn
-app = create_server()
+# Create the server instance for Smithery
+server = create_server()
+
+# For direct uvicorn usage, we need to run through smithery.cli
+# The server should be run with: python -m smithery.cli.dev
+# Not directly with uvicorn
