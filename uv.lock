@@ -1,0 +1,20 @@
+version = 1
+
+[[package]]
+name = "youtube-music-mcp"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "mcp" },
+    { name = "pydantic" },
+    { name = "smithery" },
+    { name = "ytmusicapi" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mcp", specifier = ">=1.13.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "smithery", specifier = ">=0.1.23" },
+    { name = "ytmusicapi", specifier = ">=1.7.0" },
+]
