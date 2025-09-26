@@ -1,24 +1,24 @@
-runtime: "container"
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+
+runtime: container
 build:
-  dockerfile: "Dockerfile"
-  dockerBuildPath: "."
+  dockerfile: Dockerfile
+  dockerBuildPath: .
 startCommand:
-  type: "http"
+  type: http
   configSchema:
-    type: "object"
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required: []
     properties:
       youtube_music_headers:
-        type: "string"
-        title: "YouTube Music Headers"
-        description: "Full request headers from music.youtube.com browser session"
+        type: string
         default: ""
+        description: Full request headers from music.youtube.com browser session
       default_privacy:
-        type: "string"
-        title: "Default Privacy"
-        description: "Default privacy setting for new playlists"
-        default: "PRIVATE"
-        enum: ["PRIVATE", "PUBLIC", "UNLISTED"]
-    required: []
+        type: string
+        default: PRIVATE
+        description: Default privacy setting for new playlists
   exampleConfig:
     youtube_music_headers: ""
-    default_privacy: "PRIVATE"
+    default_privacy: PRIVATE
