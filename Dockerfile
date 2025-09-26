@@ -10,17 +10,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project files
 COPY pyproject.toml README.md ./
 COPY ytmusic_server ./ytmusic_server
+COPY main.py middleware.py ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir . && \
+    pip install --no-cache-dir uvicorn starlette
 
-# Set environment variable for port (Smithery expects 8081)
+# Set environment variables
 ENV PORT=8081
-ENV SMITHERY_PORT=8081
+ENV TRANSPORT=http
 
 # Expose the port
 EXPOSE 8081
 
-# Run the server using smithery CLI which properly handles the FastMCP server
-CMD ["python", "-m", "smithery.cli.dev", "--port", "8081", "--host", "0.0.0.0"]
+# Run the server with HTTP transport
+CMD ["python", "main.py"]
