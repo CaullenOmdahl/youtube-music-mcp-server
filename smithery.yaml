@@ -1,1 +1,3 @@
-runtime: "python"
+runtime: "python"build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
