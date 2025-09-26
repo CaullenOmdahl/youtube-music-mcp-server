@@ -3,8 +3,8 @@ Search YouTube Music for songs, artists, albums, and playlists. Authenticate wit
 ## Quick Setup (2 minutes)
 
 1. Go to music.youtube.com and sign in
-2. Press F12 → Console tab → Run: copy(document.cookie)
-3. Paste the result in youtube_music_cookies field below
+2. Press F12 → Network tab → Find POST request → Copy request headers
+3. Paste the headers in youtube_music_headers field below
 
 ## Features
 • Search music without auth

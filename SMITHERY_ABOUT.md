@@ -4,23 +4,23 @@ Search YouTube Music for songs, artists, albums, and playlists. Authenticate wit
 
 ## Quick Setup
 
-To use this server's full capabilities, you'll need to provide your YouTube Music cookies:
+To use this server's full capabilities, you'll need to provide your YouTube Music request headers:
 
-### Getting Your Cookies (2 Minutes)
+### Getting Your Headers (2 Minutes)
 
 1. **Open YouTube Music**
    - Go to [music.youtube.com](https://music.youtube.com) and sign in
 
-2. **Copy Your Cookies**
+2. **Capture Request Headers**
    - Press F12 to open Developer Tools
-   - Go to Console tab
-   - Paste this command and press Enter:
-   ```javascript
-   copy(document.cookie)
-   ```
+   - Go to Network tab
+   - Click around in YouTube Music (play a song, browse)
+   - Find any POST request to `/youtubei/v1/`
+   - Right-click → Copy → Copy Request Headers (Firefox)
+   - Or click request → Headers → Raw → Copy all (Chrome)
 
 3. **Configure the Server**
-   - Paste the copied string in the `youtube_music_cookies` field below
+   - Paste the complete headers in the `youtube_music_headers` field below
    - Click Save
 
 That's it! You can now manage your YouTube Music library with natural language.
@@ -53,7 +53,7 @@ Try these with Claude after setup:
 
 ## Configuration Options
 
-- **youtube_music_cookies** (Required for full features): Your browser cookies from YouTube Music
+- **youtube_music_headers** (Required for full features): Your browser request headers from YouTube Music
 - **default_privacy** (Optional): Default privacy for new playlists - PRIVATE, PUBLIC, or UNLISTED
 
 ## Privacy & Security

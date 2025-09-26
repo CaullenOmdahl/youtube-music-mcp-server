@@ -1,14 +1,14 @@
-# Maximizing YouTube Music Cookie Lifespan
+# Maximizing YouTube Music Header Authentication Lifespan
 
-## Why Cookies Expire Quickly
+## Why Headers Expire
 
-YouTube Music cookies typically expire for several reasons:
+YouTube Music headers contain authentication tokens that expire for several reasons:
 - Security measures by Google
 - Session timeout settings
 - Browser privacy features
-- Missing critical cookies
+- Missing critical header components
 
-## How to Get Longer-Lasting Cookies
+## How to Get Longer-Lasting Authentication
 
 ### 1. Sign In with "Stay Signed In"
 
@@ -18,7 +18,7 @@ YouTube Music cookies typically expire for several reasons:
 3. ✅ **CHECK "Stay signed in" or "Remember me"**
 4. Complete sign-in
 
-This can extend cookie life from hours to weeks.
+This can extend authentication validity from hours to weeks.
 
 ### 2. Use Your Primary Browser Profile
 
@@ -32,12 +32,12 @@ This can extend cookie life from hours to weeks.
 - ✅ Browser where you stay logged into Google services
 - ✅ Browser with sync enabled
 
-### 3. Extract ALL Required Cookies
+### 3. Extract Complete Request Headers
 
-Missing any of these critical cookies will cause early expiration:
+Your headers must include these critical components:
 
 ```
-Required Cookies (in order of importance):
+Required Header Components (in order of importance):
 1. SAPISID          - API authentication (lasts longest)
 2. __Secure-3PAPISID - Secure API access
 3. LOGIN_INFO       - Contains session duration
@@ -99,12 +99,12 @@ Watch for these warning signs:
    ```
 5. Update your MCP server configuration immediately
 
-## Cookie Monitoring Script
+## Authentication Monitoring Script
 
-You can check your cookie expiration with this script in the browser console:
+You can check your authentication status with this script in the browser console:
 
 ```javascript
-// Run this on music.youtube.com
+// Run this on music.youtube.com to check your cookies
 document.cookie.split('; ').forEach(c => {
     const [name, value] = c.split('=');
     if (['SAPISID', 'LOGIN_INFO', 'SIDCC', '__Secure-3PSIDCC'].includes(name)) {
@@ -121,6 +121,7 @@ if (missing.length > 0) {
     console.warn('Missing critical cookies:', missing);
     console.log('Try signing out and back in with "Stay signed in" checked');
 }
+// Then copy full request headers from Network tab
 ```
 
 ## Why Not Use API Keys?
@@ -133,11 +134,11 @@ YouTube Music doesn't offer public API keys because:
 
 ## Summary
 
-**For maximum cookie lifespan**:
+**For maximum authentication lifespan**:
 1. Always check "Stay signed in" when logging in
 2. Use your main browser profile
-3. Extract ALL required cookies
+3. Extract complete request headers
 4. Refresh every 10-14 days proactively
 5. Monitor for early warning signs of expiration
 
-With these practices, cookies can last 2-4 weeks instead of 2 hours.
+With these practices, your authentication can last 2-4 weeks instead of 2 hours.
