@@ -19,5 +19,8 @@ dependencies = [
 dev = "smithery.cli.dev:main"
 playground = "smithery.cli.playground:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["ytmusic_server"]
+
 [tool.smithery]
 server = "ytmusic_server.server:create_server"
