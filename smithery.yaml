@@ -1,3 +1,24 @@
-runtime: "python"build:
+runtime: "container"
+build:
   dockerfile: "Dockerfile"
   dockerBuildPath: "."
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      youtube_music_headers:
+        type: "string"
+        title: "YouTube Music Headers"
+        description: "Full request headers from music.youtube.com browser session"
+        default: ""
+      default_privacy:
+        type: "string"
+        title: "Default Privacy"
+        description: "Default privacy setting for new playlists"
+        default: "PRIVATE"
+        enum: ["PRIVATE", "PUBLIC", "UNLISTED"]
+    required: []
+  exampleConfig:
+    youtube_music_headers: ""
+    default_privacy: "PRIVATE"
