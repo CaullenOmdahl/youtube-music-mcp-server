@@ -597,3 +597,10 @@ def create_server():
         }
 
     return server
+
+
+if __name__ == "__main__":
+    # When running directly, start the FastMCP server
+    server = create_server()
+    import uvicorn
+    uvicorn.run(server, host="0.0.0.0", port=8000)
