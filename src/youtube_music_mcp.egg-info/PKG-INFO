@@ -2,10 +2,10 @@ Metadata-Version: 2.4
 Name: youtube-music-mcp
 Version: 1.0.0
 Summary: YouTube Music MCP Server - Search, manage playlists, and curate music
-Requires-Python: >=3.10
+Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: mcp>=1.13.0
-Requires-Dist: smithery>=0.1.23
+Requires-Dist: smithery>=0.3.1
 Requires-Dist: ytmusicapi>=1.7.0
 Requires-Dist: pydantic>=2.0.0
 
