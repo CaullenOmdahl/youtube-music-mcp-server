@@ -350,15 +350,21 @@ async def mcp_handler(request: Request):
     except:
         mcp_request = {}
 
-    # Check if this is an initialization request
-    if mcp_request.get("method") == "initialize":
-        # Allow initialization without auth
+    # Check which method is being called
+    method = mcp_request.get("method")
+
+    # Allow these methods without authentication (for Smithery scanning)
+    unauthenticated_methods = ["initialize", "initialized", "tools/list"]
+
+    # Check if this is an unauthenticated method
+    if method in unauthenticated_methods:
+        # Allow these methods without auth
         response = await handle_mcp_request(session, mcp_request)
         if response:
-            return JSONResponse(response)
-        return Response(status_code=202)  # Accepted for notifications
+            return JSONResponse(response, headers={"Mcp-Session-Id": session_id})
+        return Response(status_code=202, headers={"Mcp-Session-Id": session_id})
 
-    # For other requests, check authentication
+    # For authenticated methods, check authentication
     if auth_header.startswith('Bearer '):
         access_token = auth_header[7:]
 
@@ -379,8 +385,8 @@ async def mcp_handler(request: Request):
                     },
                     status_code=401
                 )
-    elif mcp_request.get("method") not in ["initialized", "tools/list"]:
-        # Return auth required for methods that need it
+    else:
+        # No authentication provided for methods that require it
         return JSONResponse(
             {
                 "jsonrpc": "2.0",
