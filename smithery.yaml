@@ -3,4 +3,43 @@ build:
   dockerfile: "Dockerfile"
   dockerBuildPath: "."
 startCommand:
-  type: "http"
+  type: "http"    🎵 YouTube Music MCP Server
+
+    Control your YouTube Music library with natural language! This MCP server provides
+    powerful tools to search, create, and manage your YouTube Music playlists.
+
+    **Available Tools:**
+
+    🔍 **search_music**
+    - Search for songs, albums, artists, and playlists
+    - Filter results by type
+    - Customizable result limits
+
+    📋 **create_playlist**
+    - Create new playlists with custom titles and descriptions
+    - Set privacy levels (private, public, unlisted)
+
+    ➕ **add_songs_to_playlist**
+    - Add multiple songs to existing playlists
+    - Batch operations supported
+
+    📚 **get_playlists**
+    - View all your YouTube Music playlists
+    - See playlist metadata and track counts
+
+    🎵 **get_playlist_details**
+    - Get detailed information about specific playlists
+    - View all tracks in a playlist
+
+    **Authentication:**
+    This server uses OAuth 2.0 with Google for secure access to your YouTube Music account.
+    On first use, you'll be prompted to authorize access through Google.
+
+    **Setup Required:**
+    The server administrator must configure Google OAuth credentials by setting:
+    - GOOGLE_CLIENT_ID
+    - GOOGLE_CLIENT_SECRET
+
+    These can be obtained from the Google Cloud Console by creating an OAuth 2.0 client.
+
+    **Note:** Without OAuth configuration, the server will provide mock data for testing.
