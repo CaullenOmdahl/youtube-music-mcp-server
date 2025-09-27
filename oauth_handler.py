@@ -93,6 +93,10 @@ class OAuthHandler:
         Create authorization URL for OAuth flow
         Returns data matching MCP OAuth spec
         """
+        # Ensure credentials are available
+        if not self.client_id or not self.client_secret:
+            raise ValueError("OAuth credentials not configured. Server owner must set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.")
+
         # Generate state for CSRF protection
         state = secrets.token_urlsafe(32)
 
