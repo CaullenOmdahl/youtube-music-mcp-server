@@ -1,70 +1,68 @@
+#!/usr/bin/env python3
 """
-YouTube Music MCP Server with HTTP Transport
-
-A Python MCP server for YouTube Music operations with HTTP transport support.
-Handles session configuration passed via query parameters.
+YouTube Music MCP Server - Minimal FastMCP Implementation
 """
 
 import os
 import uvicorn
+from mcp.server.fastmcp import FastMCP
 from starlette.middleware.cors import CORSMiddleware
-from typing import Optional, Dict, Any
-import contextvars
 
-# Import our existing server
-from ytmusic_server.server import create_server
-from middleware import SmitheryConfigMiddleware
+# Initialize FastMCP server
+mcp = FastMCP(name="YouTube Music MCP")
 
-def get_request_config() -> dict:
-    """Get full config from current request context."""
-    try:
-        # Access the current request context
-        import contextvars
+@mcp.tool()
+def test_connection() -> str:
+    """Test that the MCP server is working"""
+    return "YouTube Music MCP Server is connected!"
 
-        # Try to get from request context if available
-        request = contextvars.copy_context().get('request')
-        if hasattr(request, 'scope') and request.scope:
-            return request.scope.get('smithery_config', {})
-    except:
-        pass
+@mcp.tool()
+def search_music_mock(query: str) -> str:
+    """
+    Mock search for testing (OAuth not configured yet)
 
-    # Return empty dict if no config found
-    return {}
+    Args:
+        query: Search query
+    """
+    return f"Mock results for: {query}. OAuth authentication will be added soon."
 
-def get_config_value(key: str, default=None):
-    """Get a specific config value from current request."""
-    config = get_request_config()
-    if config is None:
-        config = {}
-    return config.get(key, default)
+@mcp.tool()
+def list_features() -> str:
+    """List planned features"""
+    return """
+    Planned features:
+    - search_music: Search YouTube Music
+    - create_playlist: Create playlists
+    - add_songs_to_playlist: Add songs
+    - get_playlists: List playlists
+    """
 
 def main():
-    """Main entry point for the server."""
-    transport_mode = os.getenv("TRANSPORT", "http")
+    """Main entry point"""
+    print("YouTube Music MCP Server starting...")
 
-    if transport_mode == "http":
-        print("YouTube Music MCP Server starting in HTTP mode...")
+    # Get the app with CORS
+    app = mcp.streamable_http_app()
 
-        # Use smithery.cli.dev for HTTP mode since SmitheryFastMCP handles the HTTP transport
-        # We cannot directly use uvicorn with SmitheryFastMCP
-        import subprocess
-        import sys
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["mcp-session-id", "mcp-protocol-version"],
+        max_age=86400,
+    )
 
-        port = int(os.environ.get("PORT", 8081))
-        print(f"Starting server on port {port}")
+    # Get port from environment (Smithery sets this)
+    port = int(os.environ.get("PORT", 8081))
 
-        # Run the smithery dev server which handles HTTP transport properly
-        subprocess.run([
-            sys.executable, "-m", "smithery.cli.dev",
-            "--port", str(port),
-            "--host", "0.0.0.0"
-        ])
+    print(f"Server listening on port {port}")
+    print("MCP endpoint: /mcp")
 
-    else:
-        # Fallback to stdio mode for local development
-        print("YouTube Music MCP Server starting in stdio mode...")
-        mcp_server = create_server()
-        mcp_server.run()
+    # Run server
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
 
 if __name__ == "__main__":
     main()

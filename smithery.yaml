@@ -4,31 +4,3 @@ build:
   dockerBuildPath: "."
 startCommand:
   type: "http"
-  authentication:
-    type: "oauth2"
-    authorizationEndpoint: "/oauth/authorize"
-    tokenEndpoint: "/oauth/token"
-    refreshEndpoint: "/oauth/refresh"
-    scopes:
-      - "youtube"
-  description: |
-    YouTube Music MCP Server with OAuth Authentication
-
-    This MCP server provides tools to interact with YouTube Music:
-    - Search for songs, albums, artists, and playlists
-    - Create and manage playlists
-    - Add songs to playlists
-    - Get your library playlists
-
-    Authentication:
-    On first connection, you'll be prompted to authorize with Google.
-    After authorization, all authentication is handled automatically.
-
-    Available Tools:
-    - search_music: Search YouTube Music for content
-    - create_playlist: Create a new playlist
-    - add_songs_to_playlist: Add songs to an existing playlist
-    - get_playlists: Get your YouTube Music playlists
-
-    Note: Server owner must set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
-    environment variables in Smithery deployment settings.
