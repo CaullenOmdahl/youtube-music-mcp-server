@@ -56,6 +56,8 @@ import time
 import base64
 from typing import Optional, List, Dict, Any
 import logging
+import os
+from pathlib import Path
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +69,12 @@ class ConfigSchema(BaseModel):
 
     youtube_music_headers: str = Field(
         default="",
-        description="Full request headers from music.youtube.com browser session. Go to music.youtube.com -> F12 -> Network tab -> Find any POST request to music.youtube.com -> Right-click -> Copy -> Copy request headers"
+        description="Full request headers from music.youtube.com browser session (optional if using OAuth)"
+    )
+
+    oauth_tokens: str = Field(
+        default="",
+        description="OAuth tokens from browser.json file (paste the entire contents if using OAuth)"
     )
 
     default_privacy: str = Field(
@@ -77,21 +84,58 @@ class ConfigSchema(BaseModel):
 
 
 class YouTubeMusicAPI:
-    """Wrapper for YouTube Music API with header-based auth"""
+    """Wrapper for YouTube Music API with OAuth or header-based auth"""
 
-    def __init__(self, headers_raw: str):
-        """Initialize with raw headers string"""
+    def __init__(self, headers_raw: str = "", oauth_tokens: str = ""):
+        """Initialize with auth configuration"""
         self.headers_raw = headers_raw
+        self.oauth_tokens = oauth_tokens
         self.ytmusic = None
         self.authenticated = False
+
+    def setup_auth(self) -> bool:
+        """Setup authentication using OAuth tokens or headers"""
+        try:
+            # Try OAuth tokens first if provided
+            if self.oauth_tokens and self.oauth_tokens.strip():
+                try:
+                    # Parse OAuth tokens and create temporary file
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                        f.write(self.oauth_tokens)
+                        temp_path = f.name
+
+                    logger.info("Using OAuth authentication from provided tokens")
+                    self.ytmusic = YTMusic(temp_path)
+                    self.authenticated = True
+
+                    # Clean up temp file
+                    os.unlink(temp_path)
+
+                    logger.info("Successfully authenticated with YouTube Music using OAuth")
+                    return True
+                except Exception as e:
+                    logger.error(f"Failed to use OAuth tokens: {e}")
+
+            # Fall back to headers if provided
+            if self.headers_raw and self.headers_raw.strip():
+                return self.setup_from_headers()
+
+            # No authentication available
+            logger.warning("No authentication method available. Using unauthenticated mode (search only).")
+            self.ytmusic = YTMusic()
+            self.authenticated = False
+            return False
+
+        except Exception as e:
+            logger.error(f"Authentication setup failed: {e}")
+            self.ytmusic = YTMusic()
+            self.authenticated = False
+            return False
 
     def setup_from_headers(self) -> bool:
         """Setup authentication from raw headers string"""
         try:
-            if not self.headers_raw.strip():
-                logger.error("No headers provided")
-                return False
-
             # Validate headers contain required elements
             headers_lower = self.headers_raw.lower()
             if 'cookie:' not in headers_lower:
@@ -100,7 +144,7 @@ class YouTubeMusicAPI:
 
             # Check for common header format indicators
             if not any(h in headers_lower for h in ['accept:', 'user-agent:', 'referer:']):
-                logger.error("Headers don't appear to be in the correct format. Make sure to copy the full request headers.")
+                logger.error("Headers don't appear to be in the correct format.")
                 return False
 
             if 'music.youtube.com' not in self.headers_raw:
@@ -112,14 +156,11 @@ class YouTubeMusicAPI:
             # Initialize YTMusic with auth
             self.ytmusic = YTMusic(auth_dict)
             self.authenticated = True
-            logger.info("Successfully authenticated with YouTube Music using provided headers")
+            logger.info("Successfully authenticated with YouTube Music using headers")
             return True
 
         except Exception as e:
-            logger.error(f"Authentication failed: {e}")
-            # Fall back to unauthenticated mode for search
-            self.ytmusic = YTMusic()
-            self.authenticated = False
+            logger.error(f"Header authentication failed: {e}")
             return False
 
 
@@ -149,16 +190,24 @@ def create_server():
         session_id = id(ctx.session_config) if ctx and ctx.session_config else "default"
 
         if session_id not in ytmusic_sessions:
-            # Check if headers are provided
-            headers = ctx.session_config.youtube_music_headers if ctx and ctx.session_config else ""
+            # Get configuration
+            config = ctx.session_config if ctx and ctx.session_config else None
 
-            if not headers:
-                # Return None to indicate no headers configured
-                return None
+            if config:
+                headers = config.youtube_music_headers
+                oauth_tokens = config.oauth_tokens
+            else:
+                # Default: no authentication
+                headers = ""
+                oauth_tokens = ""
 
-            # Create new instance with session's headers
-            yt = YouTubeMusicAPI(headers)
-            yt.setup_from_headers()
+            # Create new instance
+            yt = YouTubeMusicAPI(headers, oauth_tokens)
+            if not yt.setup_auth():
+                if not oauth_tokens and not headers:
+                    # No auth method configured
+                    return None
+
             ytmusic_sessions[session_id] = yt
 
         return ytmusic_sessions[session_id]
@@ -586,14 +635,38 @@ def create_server():
                 "message": "YouTube Music headers not configured. Please add headers in server settings."
             }
 
+        # Test authentication with a simple operation
+        auth_test_passed = False
+        library_access = False
+
+        if yt.authenticated:
+            try:
+                # Test search capability
+                test_results = yt.ytmusic.search("test", filter="songs", limit=1)
+                auth_test_passed = bool(test_results)
+
+                # Test library access (may fail with some auth methods)
+                try:
+                    yt.ytmusic.get_library_playlists(limit=1)
+                    library_access = True
+                except:
+                    library_access = False
+            except:
+                auth_test_passed = False
+
         return {
-            "authenticated": yt.authenticated,
+            "authenticated": yt.authenticated and auth_test_passed,
             "capabilities": {
-                "search": True,  # Always available
-                "playlist_management": yt.authenticated,
-                "library_access": yt.authenticated
+                "search": auth_test_passed,
+                "playlist_management": yt.authenticated and auth_test_passed,
+                "library_access": library_access
             },
-            "message": "Authenticated and ready!" if yt.authenticated else "Limited to search only. Add headers for full access."
+            "message": (
+                "✅ Authenticated and ready!" if auth_test_passed else
+                "⚠️ Authentication incomplete. Please check your headers."
+            ) + (
+                " (Note: Library access may be limited)" if auth_test_passed and not library_access else ""
+            )
         }
 
     return server

@@ -7,10 +7,15 @@ startCommand:
   configSchema:
     type: "object"
     properties:
+      oauth_tokens:
+        type: "string"
+        title: "OAuth Tokens (Recommended)"
+        description: "Paste the entire contents of your browser.json file here (generated from local OAuth setup)"
+        default: ""
       youtube_music_headers:
         type: "string"
-        title: "YouTube Music Headers"
-        description: "Full request headers from music.youtube.com browser session"
+        title: "Browser Headers (Alternative)"
+        description: "Full request headers from music.youtube.com browser session (use if not using OAuth)"
         default: ""
       default_privacy:
         type: "string"
@@ -20,5 +25,6 @@ startCommand:
         enum: ["PRIVATE", "PUBLIC", "UNLISTED"]
     required: []
   exampleConfig:
+    oauth_tokens: ""
     youtube_music_headers: ""
     default_privacy: "PRIVATE"

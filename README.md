@@ -8,7 +8,7 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 - 📋 **Playlist Management** - Create, edit, delete, and manage playlists
 - 🎵 **Library Access** - Access and modify your personal YouTube Music library
 
-- 🔐 **Secure Authentication** - Header-based authentication keeps your credentials safe
+- 🔐 **Secure Authentication** - OAuth or header-based authentication options
 
 ## Installation
 
@@ -32,8 +32,29 @@ pip install -e .
 
 # Run the server
 python -m ytmusic_server
-- 
-## Getting Your Headers
+```
+
+## Authentication Setup
+
+You can authenticate using either OAuth (recommended) or browser headers.
+
+### Option 1: OAuth Authentication (Recommended)
+
+OAuth provides persistent authentication that doesn't expire:
+
+```bash
+# Run the OAuth setup script
+python run_oauth_setup.py
+```
+
+Follow the prompts to:
+1. Visit the authorization URL
+2. Sign in with your Google account
+3. Grant permissions to access YouTube Music
+
+This creates a `browser.json` file with refresh tokens that the server uses automatically.
+
+### Option 2: Browser Headers
 
 To use authenticated features (playlist management, library access), you need to provide your YouTube Music request headers. Here's how:
 

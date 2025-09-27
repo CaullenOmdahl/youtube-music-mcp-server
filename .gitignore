@@ -153,6 +153,7 @@ browser.json
 *.secret
 config.local.json
 .env.local
+oauth.json
 
 # IDE
 .idea/

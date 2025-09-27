@@ -10,12 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project files
 COPY pyproject.toml README.md ./
 COPY ytmusic_server ./ytmusic_server
-COPY main.py middleware.py ./
+COPY main.py main_oauth.py middleware.py oauth_handler.py ./
+COPY mcp_oauth_integration.py ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir . && \
-    pip install --no-cache-dir uvicorn starlette
+    pip install --no-cache-dir uvicorn starlette httpx
 
 # Set environment variables
 ENV PORT=8081
@@ -24,5 +25,5 @@ ENV TRANSPORT=http
 # Expose the port
 EXPOSE 8081
 
-# Run the server with HTTP transport
-CMD ["python", "main.py"]
+# Run the OAuth-enabled server with HTTP transport
+CMD ["python", "main_oauth.py"]
