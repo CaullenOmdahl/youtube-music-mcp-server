@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project files
 COPY pyproject.toml README.md ./
 COPY ytmusic_server ./ytmusic_server
-COPY main.py main_oauth.py middleware.py oauth_handler.py ./
-COPY mcp_oauth_integration.py ./
+COPY main_mcp_oauth.py oauth_handler.py ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -25,5 +24,5 @@ ENV TRANSPORT=http
 # Expose the port
 EXPOSE 8081
 
-# Run the OAuth-enabled server with HTTP transport
-CMD ["python", "main_oauth.py"]
+# Run the unified MCP-OAuth server
+CMD ["python", "main_mcp_oauth.py"]
