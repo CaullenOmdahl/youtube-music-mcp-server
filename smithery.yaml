@@ -4,27 +4,18 @@ build:
   dockerBuildPath: "."
 startCommand:
   type: "http"
-  configSchema:
-    type: "object"
-    properties:
-      oauth_tokens:
-        type: "string"
-        title: "OAuth Tokens (Recommended)"
-        description: "Paste the entire contents of your browser.json file here (generated from local OAuth setup)"
-        default: ""
-      youtube_music_headers:
-        type: "string"
-        title: "Browser Headers (Alternative)"
-        description: "Full request headers from music.youtube.com browser session (use if not using OAuth)"
-        default: ""
-      default_privacy:
-        type: "string"
-        title: "Default Privacy"
-        description: "Default privacy setting for new playlists"
-        default: "PRIVATE"
-        enum: ["PRIVATE", "PUBLIC", "UNLISTED"]
-    required: []
-  exampleConfig:
-    oauth_tokens: ""
-    youtube_music_headers: ""
-    default_privacy: "PRIVATE"
+  authentication:
+    type: "oauth2"
+    authorizationEndpoint: "/oauth/authorize"
+    tokenEndpoint: "/oauth/token"
+    refreshEndpoint: "/oauth/refresh"
+    scopes:
+      - "youtube"
+  description: |
+    YouTube Music MCP Server with OAuth Authentication
+
+    This server uses OAuth 2.0 for secure YouTube Music access.
+    On first connection, you'll be prompted to authorize with Google.
+    After authorization, all authentication is handled automatically.
+
+    No manual configuration or token management required!
