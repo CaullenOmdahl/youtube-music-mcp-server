@@ -1,0 +1,45 @@
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      auth_mode:
+        type: "string"
+        title: "Authentication Mode"
+        description: "Choose how to authenticate with YouTube Music"
+        default: "headers"
+        enum: ["headers", "oauth_tokens"]
+      youtube_music_headers:
+        type: "string"
+        title: "Browser Headers"
+        description: "Full request headers from music.youtube.com (required if using headers mode)"
+        default: ""
+      oauth_tokens:
+        type: "string"
+        title: "OAuth Tokens"
+        description: "Paste entire browser.json contents (required if using oauth_tokens mode)"
+        default: ""
+      default_privacy:
+        type: "string"
+        title: "Default Privacy"
+        description: "Default privacy setting for new playlists"
+        default: "PRIVATE"
+        enum: ["PRIVATE", "PUBLIC", "UNLISTED"]
+    required: []
+  exampleConfig:
+    auth_mode: "headers"
+    youtube_music_headers: ""
+    oauth_tokens: ""
+    default_privacy: "PRIVATE"
+  description: |
+    YouTube Music MCP Server
+
+    Two authentication options:
+    1. **Browser Headers**: Copy request headers from music.youtube.com
+    2. **OAuth Tokens**: Paste browser.json contents from local OAuth setup
+
+    Choose your preferred method in auth_mode.
