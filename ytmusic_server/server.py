@@ -67,14 +67,19 @@ logger = logging.getLogger(__name__)
 class ConfigSchema(BaseModel):
     """Configuration schema for YouTube Music authentication"""
 
+    auth_mode: str = Field(
+        default="headers",
+        description="Authentication mode: 'headers' or 'oauth_tokens'"
+    )
+
     youtube_music_headers: str = Field(
         default="",
-        description="Full request headers from music.youtube.com browser session (optional if using OAuth)"
+        description="Full request headers from music.youtube.com browser session (required if auth_mode is 'headers')"
     )
 
     oauth_tokens: str = Field(
         default="",
-        description="OAuth tokens from browser.json file (paste the entire contents if using OAuth)"
+        description="OAuth tokens from browser.json file (paste the entire contents if auth_mode is 'oauth_tokens')"
     )
 
     default_privacy: str = Field(
@@ -194,8 +199,14 @@ def create_server():
             config = ctx.session_config if ctx and ctx.session_config else None
 
             if config:
-                headers = config.youtube_music_headers
-                oauth_tokens = config.oauth_tokens
+                auth_mode = config.auth_mode
+                # Use authentication based on mode
+                if auth_mode == "oauth_tokens":
+                    headers = ""
+                    oauth_tokens = config.oauth_tokens
+                else:  # Default to headers mode
+                    headers = config.youtube_music_headers
+                    oauth_tokens = ""
             else:
                 # Default: no authentication
                 headers = ""
