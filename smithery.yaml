@@ -26,12 +26,6 @@ startCommand:
         title: "Encryption Key"
         description: "32-byte base64 encryption key for token storage"
         format: "password"
-      log_level:
-        type: "string"
-        title: "Log Level"
-        description: "Logging level for the server"
-        default: "INFO"
-        enum: ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
       rate_limit_per_minute:
         type: "integer"
         title: "Rate Limit Per Minute"
@@ -39,20 +33,10 @@ startCommand:
         default: 60
         minimum: 1
         maximum: 300
-      enable_metrics:
-        type: "boolean"
-        title: "Enable Prometheus Metrics"
-        description: "Enable Prometheus metrics collection"
-        default: true
     required: ["oauth_client_id", "oauth_client_secret", "encryption_key"]
   exampleConfig:
     oauth_client_id: "your-client-id.googleusercontent.com"
     oauth_client_secret: "GOCSPX-your-client-secret"
     encryption_key: "base64-encoded-32-byte-key"
     redis_url: "redis://localhost:6379"
-    log_level: "INFO"
     rate_limit_per_minute: 60
-    enable_metrics: true
-env:
-  PORT: "8081"
-  PYTHONPATH: "/app"
