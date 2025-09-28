@@ -528,11 +528,27 @@ def create_server() -> YouTubeMusicMCPServer:
     Returns:
         Configured server instance
     """
+    # Load and validate encryption key
+    encryption_key = os.getenv("ENCRYPTION_KEY")
+    if encryption_key:
+        try:
+            # Test if the provided key is valid
+            import base64
+            key_bytes = base64.b64decode(encryption_key)
+            if len(key_bytes) != 32:
+                logger.warning("Invalid encryption key provided, generating new one")
+                encryption_key = EncryptionManager.generate_key()
+        except Exception:
+            logger.warning("Failed to decode encryption key, generating new one")
+            encryption_key = EncryptionManager.generate_key()
+    else:
+        encryption_key = EncryptionManager.generate_key()
+
     # Load configuration from environment
     server_config = ServerConfig(
         oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
         oauth_client_secret=os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
-        encryption_key=os.getenv("ENCRYPTION_KEY") or EncryptionManager.generate_key(),
+        encryption_key=encryption_key,
         redis_url=os.getenv("REDIS_URL"),
         rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
     )
