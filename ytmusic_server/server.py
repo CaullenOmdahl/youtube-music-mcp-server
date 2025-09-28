@@ -526,14 +526,25 @@ if __name__ == "__main__":
     )
 
     # Create and start server
-    async def main():
+    def main():
         server = create_server()
-        await server.start()
 
-        try:
-            # Run the MCP server
-            await server.mcp.run()
-        finally:
+        # Start async components
+        async def startup():
+            await server.start()
+
+        # Cleanup async components
+        async def cleanup():
             await server.stop()
 
-    asyncio.run(main())
+        # Run startup
+        asyncio.run(startup())
+
+        try:
+            # Run the MCP server (synchronous)
+            server.mcp.run()
+        finally:
+            # Run cleanup
+            asyncio.run(cleanup())
+
+    main()
