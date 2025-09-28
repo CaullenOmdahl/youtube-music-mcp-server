@@ -1,23 +1,62 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS builder
 
+# Security: Create non-root user
+RUN groupadd -r ytmusic && useradd -r -g ytmusic ytmusic
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Python environment
 WORKDIR /app
+COPY pyproject.toml ./
 
-# Copy requirements first for better caching
-COPY requirements.txt ./
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+FROM python:3.12-slim AS runtime
+
+# Security: Create non-root user
+RUN groupadd -r ytmusic && useradd -r -g ytmusic ytmusic
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up application directory
+WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY main.py ./
+COPY ytmusic_server ./ytmusic_server
+COPY README.md LICENSE* ./
 
-# Set environment variables for HTTP mode
-ENV PORT=8081
-ENV TRANSPORT=http
-ENV HOST=0.0.0.0
+# Security: Set ownership and permissions
+RUN chown -R ytmusic:ytmusic /app && \
+    chmod -R 755 /app
 
-# Expose the port
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8081}/health || exit 1
+
+# Security: Run as non-root user
+USER ytmusic
+
+# Environment variables
+ENV PYTHONPATH=/app \
+    PORT=8081 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Expose port
 EXPOSE 8081
 
-# Run the MCP server
-CMD ["python", "main.py"]
+# Run the application
+CMD ["python", "-m", "uvicorn", "ytmusic_server.server:app", "--host", "0.0.0.0", "--port", "8081", "--workers", "1"]

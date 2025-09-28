@@ -1,683 +1,539 @@
 """
-YouTube Music MCP Server with Header-Based Authentication
-Deployable on Smithery with per-session configuration
-
-IMPORTANT INSTRUCTIONS FOR ASSISTANTS:
-=======================================
-
-This MCP server provides TOOLS, not intelligence. You (the assistant) must handle all the thinking and decision-making.
-
-CORE PRINCIPLE:
-- The server executes specific commands (search for "Song X", create playlist "Y", add video IDs)
-- You interpret user requests and decide what specific actions to take
-- You research/determine what songs to search for based on descriptions
-
-WORKFLOW FOR PLAYLIST CREATION:
-1. User request: "Create a playlist of 90s rock hits"
-2. You decide: What specific 90s rock songs to include
-3. You execute:
-   - create_playlist() to make the playlist
-   - search_music() for each specific song (e.g., "Smells Like Teen Spirit Nirvana")
-   - add_songs_to_playlist() with the collected video IDs
-
-DO:
-- Search for SPECIFIC songs by name and artist
-- Break down complex requests into individual searches
-- Handle curation and song selection yourself
-- Use video IDs immediately after searching (they can become stale)
-- If batch adding fails, try smaller batches or individual songs
-
-DON'T:
-- Don't pass descriptions to search (NOT "upbeat music" or "90s hits")
-- Don't expect the server to understand genres, moods, or decades
-- Don't pass long descriptions to any tool
-- Don't expect the server to make musical decisions
-
-SEARCH EXAMPLES:
-✅ GOOD: search_music("Bohemian Rhapsody Queen")
-✅ GOOD: search_music("Shape of You Ed Sheeran")
-❌ BAD: search_music("popular songs from 2020")
-❌ BAD: search_music("workout music")
-
-ERROR HANDLING:
-- "YouTube Music headers not configured" → Guide user through header setup
-- "401 Unauthorized" → Headers have expired, user needs to refresh them
-- "400 Precondition check failed" → Video IDs are invalid/stale, search for fresh ones
-- No search results → Try alternative search terms (without featured artists, etc.)
+Main MCP server implementation for YouTube Music integration.
 """
 
-from pydantic import BaseModel, Field
-from mcp.server.fastmcp import Context, FastMCP
-from smithery.decorators import smithery
-from ytmusicapi import YTMusic, setup
-import json
-import hashlib
-import time
-import base64
-from typing import Optional, List, Dict, Any
-import logging
+import asyncio
 import os
-from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence
+import structlog
+from mcp.server.fastmcp import FastMCP
+from mcp import types
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .models.config import ServerConfig, OAuthConfig, SecurityConfig, APIConfig
+from .models.auth import UserSession, OAuthToken, AuthState
+from .auth.oauth_manager import OAuthManager
+from .auth.session_manager import SessionManager
+from .auth.token_storage import MemoryTokenStorage, RedisTokenStorage
+from .security.encryption import EncryptionManager
+from .security.validators import SecurityValidator
+from .security.middleware import SecurityMiddleware
+from .ytmusic.client import YTMusicClient
+from .ytmusic.rate_limiter import RateLimiter
+from .monitoring.metrics import MetricsCollector
+from .monitoring.health_check import HealthChecker
 
-
-class ConfigSchema(BaseModel):
-    """Configuration schema for YouTube Music authentication"""
-
-    auth_mode: str = Field(
-        default="headers",
-        description="Authentication mode: 'headers' or 'oauth_tokens'"
-    )
-
-    youtube_music_headers: str = Field(
-        default="",
-        description="Full request headers from music.youtube.com browser session (required if auth_mode is 'headers')"
-    )
-
-    oauth_tokens: str = Field(
-        default="",
-        description="OAuth tokens from browser.json file (paste the entire contents if auth_mode is 'oauth_tokens')"
-    )
-
-    default_privacy: str = Field(
-        default="PRIVATE",
-        description="Default privacy for new playlists: PRIVATE, PUBLIC, or UNLISTED"
-    )
+logger = structlog.get_logger(__name__)
 
 
-class YouTubeMusicAPI:
-    """Wrapper for YouTube Music API with OAuth or header-based auth"""
-
-    def __init__(self, headers_raw: str = "", oauth_tokens: str = ""):
-        """Initialize with auth configuration"""
-        self.headers_raw = headers_raw
-        self.oauth_tokens = oauth_tokens
-        self.ytmusic = None
-        self.authenticated = False
-
-    def setup_auth(self) -> bool:
-        """Setup authentication using OAuth tokens or headers"""
-        try:
-            # Try OAuth tokens first if provided
-            if self.oauth_tokens and self.oauth_tokens.strip():
-                try:
-                    # Parse OAuth tokens and create temporary file
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                        f.write(self.oauth_tokens)
-                        temp_path = f.name
-
-                    logger.info("Using OAuth authentication from provided tokens")
-                    self.ytmusic = YTMusic(temp_path)
-                    self.authenticated = True
-
-                    # Clean up temp file
-                    os.unlink(temp_path)
-
-                    logger.info("Successfully authenticated with YouTube Music using OAuth")
-                    return True
-                except Exception as e:
-                    logger.error(f"Failed to use OAuth tokens: {e}")
-
-            # Fall back to headers if provided
-            if self.headers_raw and self.headers_raw.strip():
-                return self.setup_from_headers()
-
-            # No authentication available
-            logger.warning("No authentication method available. Using unauthenticated mode (search only).")
-            self.ytmusic = YTMusic()
-            self.authenticated = False
-            return False
-
-        except Exception as e:
-            logger.error(f"Authentication setup failed: {e}")
-            self.ytmusic = YTMusic()
-            self.authenticated = False
-            return False
-
-    def setup_from_headers(self) -> bool:
-        """Setup authentication from raw headers string"""
-        try:
-            # Validate headers contain required elements
-            headers_lower = self.headers_raw.lower()
-            if 'cookie:' not in headers_lower:
-                logger.error("Headers missing cookie information")
-                return False
-
-            # Check for common header format indicators
-            if not any(h in headers_lower for h in ['accept:', 'user-agent:', 'referer:']):
-                logger.error("Headers don't appear to be in the correct format.")
-                return False
-
-            if 'music.youtube.com' not in self.headers_raw:
-                logger.warning("Headers don't appear to be from music.youtube.com")
-
-            # Setup ytmusicapi using the provided headers directly
-            auth_dict = setup(headers_raw=self.headers_raw)
-
-            # Initialize YTMusic with auth
-            self.ytmusic = YTMusic(auth_dict)
-            self.authenticated = True
-            logger.info("Successfully authenticated with YouTube Music using headers")
-            return True
-
-        except Exception as e:
-            logger.error(f"Header authentication failed: {e}")
-            return False
-
-
-@smithery.server(config_schema=ConfigSchema)
-def create_server():
+class YouTubeMusicMCPServer:
     """
-    YouTube Music MCP Server - Simple tools for YouTube Music operations.
-    Uses header-based authentication from browser request headers.
+    Enterprise-grade YouTube Music MCP Server with OAuth 2.1 authentication.
 
-    IMPORTANT: This server provides tools, not intelligence. The assistant must:
-    - Interpret user requests (e.g., "90s rock playlist")
-    - Decide what specific songs to search for
-    - Execute the tools in sequence (create → search → add)
-
-    See module docstring for detailed usage instructions.
+    Features:
+    - OAuth 2.1 with PKCE authentication flow
+    - Comprehensive security and rate limiting
+    - Session management and token storage
+    - YouTube Music API integration
+    - Health monitoring and metrics collection
+    - Production-ready error handling
     """
 
-    server = FastMCP(
-        name="YouTube Music"
-    )
+    def __init__(self, config: ServerConfig):
+        self.config = config
+        self.logger = logger.bind(component="ytmusic_mcp_server")
 
-    # Store YTMusic instances per session
-    ytmusic_sessions: Dict[str, YouTubeMusicAPI] = {}
+        # Initialize core components
+        self.encryption_manager = EncryptionManager(config.encryption_key)
 
-    def get_ytmusic(ctx: Context) -> Optional[YouTubeMusicAPI]:
-        """Get or create YTMusic instance for this session"""
-        session_id = id(ctx.session_config) if ctx and ctx.session_config else "default"
+        # Initialize token storage
+        if config.redis_url:
+            self.token_storage = RedisTokenStorage(self.encryption_manager, config.redis_url)
+        else:
+            self.token_storage = MemoryTokenStorage(self.encryption_manager)
 
-        if session_id not in ytmusic_sessions:
-            # Get configuration
-            config = ctx.session_config if ctx and ctx.session_config else None
+        # Initialize managers
+        self.session_manager = SessionManager(self.token_storage, config.security_config)
+        self.oauth_manager = OAuthManager(config.oauth_config, self.token_storage)
 
-            if config:
-                auth_mode = config.auth_mode
-                # Use authentication based on mode
-                if auth_mode == "oauth_tokens":
-                    headers = ""
-                    oauth_tokens = config.oauth_tokens
-                else:  # Default to headers mode
-                    headers = config.youtube_music_headers
-                    oauth_tokens = ""
-            else:
-                # Default: no authentication
-                headers = ""
-                oauth_tokens = ""
+        # Initialize security components
+        self.security_validator = SecurityValidator()
+        self.security_middleware = SecurityMiddleware(
+            self.security_validator,
+            rate_limit_requests=config.rate_limit_per_minute,
+        )
 
-            # Create new instance
-            yt = YouTubeMusicAPI(headers, oauth_tokens)
-            if not yt.setup_auth():
-                if not oauth_tokens and not headers:
-                    # No auth method configured
-                    return None
+        # Initialize YouTube Music components
+        self.rate_limiter = RateLimiter(
+            requests_per_minute=config.api_config.rate_limit_per_minute,
+            requests_per_hour=config.api_config.rate_limit_per_hour,
+        )
+        self.ytmusic_client = YTMusicClient(config.api_config, self.rate_limiter)
 
-            ytmusic_sessions[session_id] = yt
+        # Initialize monitoring
+        self.metrics_collector = MetricsCollector()
+        self.health_checker = HealthChecker()
 
-        return ytmusic_sessions[session_id]
+        # Register health checks
+        self._register_health_checks()
 
-    # === SEARCH TOOL (Works without auth) ===
+        # MCP server
+        self.mcp = FastMCP("YouTube Music MCP Server")
+        self._register_tools()
 
-    @server.tool()
-    def search_music(
-        query: str,
-        filter: Optional[str] = None,
-        limit: int = 20,
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Search YouTube Music for SPECIFIC songs, artists, albums, or playlists.
+        self.logger.info("YouTube Music MCP Server initialized")
 
-        IMPORTANT: Search for exact names, not descriptions or genres.
-        Examples:
-        - ✅ "Blinding Lights The Weeknd"
-        - ✅ "Abbey Road Beatles album"
-        - ❌ "popular songs"
-        - ❌ "workout music"
+    def _register_health_checks(self) -> None:
+        """Register health check functions."""
+        self.health_checker.register_check("ytmusic_api", self.health_checker.check_ytmusic_api)
+        self.health_checker.register_check("memory", self.health_checker.check_memory_usage)
 
-        Args:
-            query: Specific song/artist/album name to search for
-            filter: Optional filter - 'songs', 'videos', 'albums', 'artists', 'playlists', 'uploads'
-            limit: Maximum results to return (default 20)
+    def _register_tools(self) -> None:
+        """Register MCP tools."""
 
-        Returns:
-            Search results with videoId for each result (use these IDs with add_songs_to_playlist)
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
+        # Authentication tools
+        @self.mcp.tool()
+        async def get_auth_status(session_id: Optional[str] = None) -> Dict[str, Any]:
+            """
+            Check authentication status for a session.
 
-        try:
-            results = yt.ytmusic.search(query, filter=filter, limit=limit)
-            return {
-                "success": True,
-                "count": len(results),
-                "results": results
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Search failed. Check your query and try again."
-            }
+            Args:
+                session_id: Optional session ID to check
 
-    # === PLAYLIST MANAGEMENT TOOLS (Require auth) ===
-
-    @server.tool()
-    def get_library_playlists(ctx: Context) -> Dict[str, Any]:
-        """
-        Get all playlists from your YouTube Music library.
-
-        Returns:
-            List of your playlists with IDs and metadata
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        try:
-            playlists = yt.ytmusic.get_library_playlists()
-            return {
-                "success": True,
-                "count": len(playlists),
-                "playlists": playlists
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to get playlists. Check your authentication."
-            }
-
-    @server.tool()
-    def get_playlist(playlist_id: str, ctx: Context) -> Dict[str, Any]:
-        """
-        Get detailed information about a specific playlist.
-
-        Args:
-            playlist_id: The YouTube Music playlist ID
-
-        Returns:
-            Detailed playlist information including all tracks
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        try:
-            playlist = yt.ytmusic.get_playlist(playlist_id)
-            return {
-                "success": True,
-                "playlist": playlist
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to get playlist {playlist_id}"
-            }
-
-    @server.tool()
-    def create_playlist(
-        title: str,
-        description: str = "",
-        privacy: Optional[str] = None,
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Create a new empty playlist in your YouTube Music library.
-
-        NOTE: This creates an EMPTY playlist. You must:
-        1. Create the playlist first (returns playlist_id)
-        2. Search for specific songs to add
-        3. Use add_songs_to_playlist() with the video IDs
-
-        Args:
-            title: Name of the playlist
-            description: Optional description (brief text, not a list of songs)
-            privacy: Privacy setting - PRIVATE, PUBLIC, or UNLISTED (uses default from config if not specified)
-
-        Returns:
-            The playlist_id to use with add_songs_to_playlist()
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        # Use privacy from params or fall back to config default
-        privacy = privacy or ctx.session_config.default_privacy
-
-        try:
-            playlist_id = yt.ytmusic.create_playlist(
-                title=title,
-                description=description,
-                privacy_status=privacy
-            )
-            return {
-                "success": True,
-                "playlist_id": playlist_id,
-                "message": f"Created playlist '{title}' with ID: {playlist_id}"
-            }
-        except Exception as e:
-            error_str = str(e)
-            if "401" in error_str or "Unauthorized" in error_str:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": "Authentication expired. Please refresh your YouTube Music headers from music.youtube.com"
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": f"Failed to create playlist '{title}'"
-                }
-
-    @server.tool()
-    def add_songs_to_playlist(
-        playlist_id: str,
-        video_ids: List[str],
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Add specific songs to an existing playlist using their video IDs.
-
-        WORKFLOW:
-        1. Get video IDs from search_music() results
-        2. Collect all IDs you want to add
-        3. Call this once with all IDs (more efficient than multiple calls)
-
-        Args:
-            playlist_id: The playlist ID from create_playlist()
-            video_ids: List of video IDs from search_music() results
-
-        Returns:
-            Status of the operation
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        try:
-            result = yt.ytmusic.add_playlist_items(playlist_id, video_ids)
-            return {
-                "success": True,
-                "message": f"Added {len(video_ids)} songs to playlist",
-                "result": result
-            }
-        except Exception as e:
-            error_str = str(e)
-
-            # Provide helpful error messages for common failures
-            if "401" in error_str or "Unauthorized" in error_str:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": "Authentication expired. Please refresh your YouTube Music headers."
-                }
-            elif "400" in error_str or "Precondition" in error_str:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": "Some video IDs may be invalid or outdated. Try searching for fresh IDs or adding songs individually."
-                }
-            elif "403" in error_str:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": "Permission denied. You may not have access to modify this playlist."
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": error_str,
-                    "message": f"Failed to add songs to playlist {playlist_id}"
-                }
-
-    @server.tool()
-    def remove_songs_from_playlist(
-        playlist_id: str,
-        videos: List[Dict[str, str]],
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Remove songs from a playlist.
-
-        Args:
-            playlist_id: The playlist ID
-            videos: List of video objects with videoId and setVideoId
-
-        Returns:
-            Status of the operation
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        try:
-            result = yt.ytmusic.remove_playlist_items(playlist_id, videos)
-            return {
-                "success": True,
-                "message": f"Removed {len(videos)} songs from playlist",
-                "result": result
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to remove songs from playlist {playlist_id}"
-            }
-
-    @server.tool()
-    def delete_playlist(playlist_id: str, ctx: Context = None) -> Dict[str, Any]:
-        """
-        Delete a playlist from your library.
-
-        Args:
-            playlist_id: The playlist ID to delete
-
-        Returns:
-            Status of the deletion
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        try:
-            result = yt.ytmusic.delete_playlist(playlist_id)
-            return {
-                "success": True,
-                "message": f"Deleted playlist {playlist_id}",
-                "result": result
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to delete playlist {playlist_id}"
-            }
-
-    @server.tool()
-    def edit_playlist(
-        playlist_id: str,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        privacy: Optional[str] = None,
-        ctx: Context = None
-    ) -> Dict[str, Any]:
-        """
-        Edit playlist title, description, or privacy settings.
-
-        Args:
-            playlist_id: The playlist ID to edit
-            title: New title (optional)
-            description: New description (optional)
-            privacy: New privacy setting - PRIVATE, PUBLIC, or UNLISTED (optional)
-
-        Returns:
-            Status of the edit operation
-        """
-        yt = get_ytmusic(ctx)
-        if not yt:
-            return {
-                "success": False,
-                "error": "YouTube Music headers not configured",
-                "message": "Please configure your YouTube Music headers in the server settings"
-            }
-
-        if not yt.authenticated:
-            return {
-                "success": False,
-                "error": "Authentication required",
-                "message": "Please provide YouTube Music headers in the configuration"
-            }
-
-        try:
-            result = yt.ytmusic.edit_playlist(
-                playlist_id,
-                title=title,
-                description=description,
-                privacyStatus=privacy
-            )
-            return {
-                "success": True,
-                "message": "Playlist updated successfully",
-                "result": result
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"Failed to edit playlist {playlist_id}"
-            }
-
-    # Note: Removed create_smart_playlist function
-    # The AI assistant should use the search and playlist management tools directly
-    # to build playlists based on user descriptions
-
-    @server.tool()
-    def get_auth_status(ctx: Context) -> Dict[str, Any]:
-        """
-        Check authentication status and capabilities.
-
-        Returns:
-            Current authentication status and available features
-        """
-        yt = get_ytmusic(ctx)
-
-        if not yt:
-            return {
-                "authenticated": False,
-                "capabilities": {
-                    "search": False,
-                    "playlist_management": False,
-                    "library_access": False
-                },
-                "message": "YouTube Music headers not configured. Please add headers in server settings."
-            }
-
-        # Test authentication with a simple operation
-        auth_test_passed = False
-        library_access = False
-
-        if yt.authenticated:
+            Returns:
+                Authentication status information
+            """
             try:
-                # Test search capability
-                test_results = yt.ytmusic.search("test", filter="songs", limit=1)
-                auth_test_passed = bool(test_results)
+                if not session_id:
+                    # Create new session
+                    session = await self.session_manager.create_session()
+                    auth_url = await self.oauth_manager.get_authorization_url(session)
 
-                # Test library access (may fail with some auth methods)
+                    return {
+                        "authenticated": False,
+                        "session_id": session.session_id,
+                        "auth_url": auth_url,
+                        "state": session.state.value,
+                        "expires_at": session.expires_at.isoformat(),
+                    }
+
+                # Check existing session
+                session = await self.session_manager.get_session(session_id)
+                if not session:
+                    return {"error": "Session not found", "authenticated": False}
+
+                is_authenticated = session.is_authenticated
+                response = {
+                    "authenticated": is_authenticated,
+                    "session_id": session.session_id,
+                    "state": session.state.value,
+                    "expires_at": session.expires_at.isoformat(),
+                }
+
+                if not is_authenticated and session.state == AuthState.PENDING:
+                    auth_url = await self.oauth_manager.get_authorization_url(session)
+                    response["auth_url"] = auth_url
+
+                return response
+
+            except Exception as e:
+                self.logger.error("Error checking auth status", error=str(e))
+                return {"error": str(e), "authenticated": False}
+
+        # YouTube Music search
+        @self.mcp.tool()
+        async def search_music(
+            query: str,
+            session_id: Optional[str] = None,
+            filter_type: Optional[str] = None,
+            limit: int = 20
+        ) -> Dict[str, Any]:
+            """
+            Search for music on YouTube Music.
+
+            Args:
+                query: Search query string
+                session_id: Session ID for authentication
+                filter_type: Optional filter (songs, videos, albums, artists, playlists)
+                limit: Maximum results to return (default: 20)
+
+            Returns:
+                Search results from YouTube Music
+            """
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Validate session and get OAuth token
+                session, oauth_token = await self._validate_session_and_token(session_id)
+
+                # Perform search
+                results = await self.ytmusic_client.search_music(
+                    session, oauth_token, query, filter_type, limit
+                )
+
+                # Record metrics
+                duration = asyncio.get_event_loop().time() - start_time
+                self.metrics_collector.record_request(
+                    session.session_id, "search_music", duration, True
+                )
+
+                return {
+                    "success": True,
+                    "results": results,
+                    "query": query,
+                    "count": len(results),
+                }
+
+            except Exception as e:
+                duration = asyncio.get_event_loop().time() - start_time
+                if session_id:
+                    self.metrics_collector.record_request(
+                        session_id, "search_music", duration, False, str(type(e).__name__)
+                    )
+
+                self.logger.error("Music search failed", query=query, error=str(e))
+                return {"success": False, "error": str(e)}
+
+        # Playlist management
+        @self.mcp.tool()
+        async def create_playlist(
+            name: str,
+            session_id: Optional[str] = None,
+            description: Optional[str] = None,
+            privacy_status: str = "PRIVATE"
+        ) -> Dict[str, Any]:
+            """
+            Create a new playlist on YouTube Music.
+
+            Args:
+                name: Playlist name
+                session_id: Session ID for authentication
+                description: Optional playlist description
+                privacy_status: Playlist privacy (PRIVATE, PUBLIC, UNLISTED)
+
+            Returns:
+                Created playlist information
+            """
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Validate session and get OAuth token
+                session, oauth_token = await self._validate_session_and_token(session_id)
+
+                # Create playlist
+                playlist_id = await self.ytmusic_client.create_playlist(
+                    session, oauth_token, name, description, privacy_status
+                )
+
+                # Record metrics
+                duration = asyncio.get_event_loop().time() - start_time
+                self.metrics_collector.record_request(
+                    session.session_id, "create_playlist", duration, True
+                )
+
+                return {
+                    "success": True,
+                    "playlist_id": playlist_id,
+                    "name": name,
+                    "privacy_status": privacy_status,
+                }
+
+            except Exception as e:
+                duration = asyncio.get_event_loop().time() - start_time
+                if session_id:
+                    self.metrics_collector.record_request(
+                        session_id, "create_playlist", duration, False, str(type(e).__name__)
+                    )
+
+                self.logger.error("Playlist creation failed", name=name, error=str(e))
+                return {"success": False, "error": str(e)}
+
+        @self.mcp.tool()
+        async def get_playlists(session_id: Optional[str] = None, limit: int = 25) -> Dict[str, Any]:
+            """
+            Get user's playlists from YouTube Music.
+
+            Args:
+                session_id: Session ID for authentication
+                limit: Maximum playlists to return (default: 25)
+
+            Returns:
+                User's playlists
+            """
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Validate session and get OAuth token
+                session, oauth_token = await self._validate_session_and_token(session_id)
+
+                # Get playlists
+                playlists = await self.ytmusic_client.get_user_playlists(
+                    session, oauth_token, limit
+                )
+
+                # Record metrics
+                duration = asyncio.get_event_loop().time() - start_time
+                self.metrics_collector.record_request(
+                    session.session_id, "get_playlists", duration, True
+                )
+
+                return {
+                    "success": True,
+                    "playlists": playlists,
+                    "count": len(playlists),
+                }
+
+            except Exception as e:
+                duration = asyncio.get_event_loop().time() - start_time
+                if session_id:
+                    self.metrics_collector.record_request(
+                        session_id, "get_playlists", duration, False, str(type(e).__name__)
+                    )
+
+                self.logger.error("Get playlists failed", error=str(e))
+                return {"success": False, "error": str(e)}
+
+        @self.mcp.tool()
+        async def add_songs_to_playlist(
+            playlist_id: str,
+            video_ids: List[str],
+            session_id: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """
+            Add songs to an existing playlist.
+
+            Args:
+                playlist_id: Target playlist ID
+                video_ids: List of video IDs to add
+                session_id: Session ID for authentication
+
+            Returns:
+                Operation result
+            """
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Validate session and get OAuth token
+                session, oauth_token = await self._validate_session_and_token(session_id)
+
+                # Add songs to playlist
+                success = await self.ytmusic_client.add_songs_to_playlist(
+                    session, oauth_token, playlist_id, video_ids
+                )
+
+                # Record metrics
+                duration = asyncio.get_event_loop().time() - start_time
+                self.metrics_collector.record_request(
+                    session.session_id, "add_songs_to_playlist", duration, True
+                )
+
+                return {
+                    "success": success,
+                    "playlist_id": playlist_id,
+                    "added_count": len(video_ids),
+                }
+
+            except Exception as e:
+                duration = asyncio.get_event_loop().time() - start_time
+                if session_id:
+                    self.metrics_collector.record_request(
+                        session_id, "add_songs_to_playlist", duration, False, str(type(e).__name__)
+                    )
+
+                self.logger.error("Add songs to playlist failed", playlist_id=playlist_id, error=str(e))
+                return {"success": False, "error": str(e)}
+
+        @self.mcp.tool()
+        async def get_playlist_details(
+            playlist_id: str,
+            session_id: Optional[str] = None,
+            limit: Optional[int] = None
+        ) -> Dict[str, Any]:
+            """
+            Get detailed information about a playlist.
+
+            Args:
+                playlist_id: Playlist ID
+                session_id: Session ID for authentication
+                limit: Optional limit for tracks
+
+            Returns:
+                Playlist details including tracks
+            """
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Validate session and get OAuth token
+                session, oauth_token = await self._validate_session_and_token(session_id)
+
+                # Get playlist details
+                playlist = await self.ytmusic_client.get_playlist_details(
+                    session, oauth_token, playlist_id, limit
+                )
+
+                # Record metrics
+                duration = asyncio.get_event_loop().time() - start_time
+                self.metrics_collector.record_request(
+                    session.session_id, "get_playlist_details", duration, True
+                )
+
+                return {
+                    "success": True,
+                    "playlist": playlist,
+                }
+
+            except Exception as e:
+                duration = asyncio.get_event_loop().time() - start_time
+                if session_id:
+                    self.metrics_collector.record_request(
+                        session_id, "get_playlist_details", duration, False, str(type(e).__name__)
+                    )
+
+                self.logger.error("Get playlist details failed", playlist_id=playlist_id, error=str(e))
+                return {"success": False, "error": str(e)}
+
+        # System tools
+        @self.mcp.tool()
+        async def get_server_status() -> Dict[str, Any]:
+            """
+            Get server health and status information.
+
+            Returns:
+                Server status and metrics
+            """
+            try:
+                health_status = await self.health_checker.get_health_status()
+                metrics = self.metrics_collector.get_summary_metrics()
+
+                return {
+                    "server": "YouTube Music MCP Server",
+                    "version": "2.0.0",
+                    "health": health_status,
+                    "metrics": metrics,
+                    "timestamp": asyncio.get_event_loop().time(),
+                }
+
+            except Exception as e:
+                self.logger.error("Get server status failed", error=str(e))
+                return {"error": str(e)}
+
+    async def _validate_session_and_token(self, session_id: Optional[str]) -> tuple[UserSession, OAuthToken]:
+        """
+        Validate session and get OAuth token.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Tuple of (session, oauth_token)
+
+        Raises:
+            Exception: If session is invalid or not authenticated
+        """
+        if not session_id:
+            raise Exception("Session ID is required")
+
+        session = await self.session_manager.get_session(session_id)
+        if not session:
+            raise Exception("Session not found")
+
+        if not session.is_authenticated:
+            raise Exception("Session is not authenticated")
+
+        if not session.oauth_token:
+            raise Exception("No OAuth token available")
+
+        # Check if token needs refresh
+        if session.oauth_token.is_expired:
+            if session.oauth_token.refresh_token:
                 try:
-                    yt.ytmusic.get_library_playlists(limit=1)
-                    library_access = True
-                except:
-                    library_access = False
-            except:
-                auth_test_passed = False
+                    new_token = await self.oauth_manager.refresh_token(session.oauth_token)
+                    session.oauth_token = new_token
+                    await self.session_manager.update_session(session)
+                except Exception as e:
+                    self.logger.error("Token refresh failed", session_id=session_id[:8] + "...", error=str(e))
+                    raise Exception("Token refresh failed, re-authentication required")
+            else:
+                raise Exception("Token expired and no refresh token available")
 
-        return {
-            "authenticated": yt.authenticated and auth_test_passed,
-            "capabilities": {
-                "search": auth_test_passed,
-                "playlist_management": yt.authenticated and auth_test_passed,
-                "library_access": library_access
-            },
-            "message": (
-                "✅ Authenticated and ready!" if auth_test_passed else
-                "⚠️ Authentication incomplete. Please check your headers."
-            ) + (
-                " (Note: Library access may be limited)" if auth_test_passed and not library_access else ""
-            )
-        }
+        return session, session.oauth_token
 
-    return server
+    async def start(self) -> None:
+        """Start the server and all background services."""
+        try:
+            # Start session manager
+            await self.session_manager.start()
+
+            # Start health checker
+            await self.health_checker.start()
+
+            self.logger.info("YouTube Music MCP Server started successfully")
+
+        except Exception as e:
+            self.logger.error("Failed to start server", error=str(e))
+            raise
+
+    async def stop(self) -> None:
+        """Stop the server and cleanup resources."""
+        try:
+            # Stop background services
+            await self.session_manager.stop()
+            await self.health_checker.stop()
+
+            # Close token storage if needed
+            if hasattr(self.token_storage, 'close'):
+                await self.token_storage.close()
+
+            self.logger.info("YouTube Music MCP Server stopped")
+
+        except Exception as e:
+            self.logger.error("Error stopping server", error=str(e))
+
+
+def create_server() -> YouTubeMusicMCPServer:
+    """
+    Create and configure the YouTube Music MCP server.
+
+    Returns:
+        Configured server instance
+    """
+    # Load configuration from environment
+    server_config = ServerConfig(
+        oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
+        oauth_client_secret=os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+        encryption_key=os.getenv("ENCRYPTION_KEY") or EncryptionManager.generate_key(),
+        redis_url=os.getenv("REDIS_URL"),
+        rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
+    )
+
+    return YouTubeMusicMCPServer(server_config)
+
+
+# For direct usage
+if __name__ == "__main__":
+    import uvicorn
+
+    # Configure structured logging
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.JSONRenderer()
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    # Create and start server
+    async def main():
+        server = create_server()
+        await server.start()
+
+        try:
+            # Run the MCP server
+            await server.mcp.run()
+        finally:
+            await server.stop()
+
+    asyncio.run(main())

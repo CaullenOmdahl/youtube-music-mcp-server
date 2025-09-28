@@ -5,58 +5,54 @@ build:
 startCommand:
   type: "http"
   configSchema:
-    type: object
-    required: ["googleClientId", "googleClientSecret"]
+    type: "object"
     properties:
-      googleClientId:
-        type: string
+      oauth_client_id:
+        type: "string"
         title: "Google OAuth Client ID"
-        description: "OAuth 2.0 Client ID from Google Cloud Console (format: xxx.apps.googleusercontent.com)"
-      googleClientSecret:
-        type: string
+        description: "OAuth 2.1 client ID from Google Cloud Console with YouTube Data API v3 enabled"
+      oauth_client_secret:
+        type: "string"
         title: "Google OAuth Client Secret"
-        description: "OAuth 2.0 Client Secret from Google Cloud Console"
+        description: "OAuth 2.1 client secret from Google Cloud Console"
         format: "password"
+      redis_url:
+        type: "string"
+        title: "Redis Connection URL"
+        description: "Redis URL for session and token storage (optional, defaults to in-memory)"
+        default: ""
+      encryption_key:
+        type: "string"
+        title: "Encryption Key"
+        description: "32-byte base64 encryption key for token storage"
+        format: "password"
+      log_level:
+        type: "string"
+        title: "Log Level"
+        description: "Logging level for the server"
+        default: "INFO"
+        enum: ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+      rate_limit_per_minute:
+        type: "integer"
+        title: "Rate Limit Per Minute"
+        description: "Maximum API requests per minute per user"
+        default: 60
+        minimum: 1
+        maximum: 300
+      enable_metrics:
+        type: "boolean"
+        title: "Enable Prometheus Metrics"
+        description: "Enable Prometheus metrics collection"
+        default: true
+    required: ["oauth_client_id", "oauth_client_secret", "encryption_key"]
+  exampleConfig:
+    oauth_client_id: "your-client-id.googleusercontent.com"
+    oauth_client_secret: "GOCSPX-your-client-secret"
+    encryption_key: "base64-encoded-32-byte-key"
+    redis_url: "redis://localhost:6379"
+    log_level: "INFO"
+    rate_limit_per_minute: 60
+    enable_metrics: true
 env:
-  TRANSPORT: "http"
-  HOST: "0.0.0.0"
-  PORT: "8081"    🎵 YouTube Music MCP Server
-
-    Control your YouTube Music library with natural language! This MCP server provides
-    powerful tools to search, create, and manage your YouTube Music playlists.
-
-    **Available Tools:**
-
-    🔍 **search_music**
-    - Search for songs, albums, artists, and playlists
-    - Filter results by type
-    - Customizable result limits
-
-    📋 **create_playlist**
-    - Create new playlists with custom titles and descriptions
-    - Set privacy levels (private, public, unlisted)
-
-    ➕ **add_songs_to_playlist**
-    - Add multiple songs to existing playlists
-    - Batch operations supported
-
-    📚 **get_playlists**
-    - View all your YouTube Music playlists
-    - See playlist metadata and track counts
-
-    🎵 **get_playlist_details**
-    - Get detailed information about specific playlists
-    - View all tracks in a playlist
-
-    **Authentication:**
-    This server uses OAuth 2.0 with Google for secure access to your YouTube Music account.
-    On first use, you'll be prompted to authorize access through Google.
-
-    **Setup Required:**
-    The server administrator must configure Google OAuth credentials by setting:
-    - GOOGLE_CLIENT_ID
-    - GOOGLE_CLIENT_SECRET
-
-    These can be obtained from the Google Cloud Console by creating an OAuth 2.0 client.
-
-    **Note:** Without OAuth configuration, the server will provide mock data for testing.
+  PORT: "8081"
+  PYTHONPATH: "/app"

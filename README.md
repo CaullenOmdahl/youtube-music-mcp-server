@@ -1,284 +1,318 @@
 # YouTube Music MCP Server
 
-A Model Context Protocol (MCP) server that enables AI assistants to interact with YouTube Music. Search for music, manage playlists, and control your YouTube Music library through natural language commands.
+> **Enterprise-grade YouTube Music integration for AI agents with OAuth 2.1 authentication**
 
-## Features
+An advanced Model Context Protocol (MCP) server that provides secure YouTube Music functionality to AI agents through OAuth 2.1 authentication, deployed on Smithery.ai with comprehensive security and monitoring features.
 
-- 🔍 **Search** - Search for songs, albums, artists, playlists, and videos
-- 📋 **Playlist Management** - Create, edit, delete, and manage playlists
-- 🎵 **Library Access** - Access and modify your personal YouTube Music library
+## 🎯 Features
 
-- 🔐 **Secure Authentication** - OAuth or header-based authentication options
+### 🔐 Security & Authentication
+- **OAuth 2.1 with PKCE** - Full compliance with RFC 7636 using S256 challenge method
+- **AES-256 Encryption** - Secure token storage using Fernet encryption
+- **Session Management** - Stateful session tracking with automatic cleanup
+- **Rate Limiting** - Per-session limits with exponential backoff
+- **Security Middleware** - Input validation, CORS, and security headers
 
-## Installation
+### 🎵 YouTube Music Integration
+- **Music Search** - Search songs, albums, artists, and playlists with filters
+- **Playlist Management** - Create, modify, and manage user playlists
+- **Library Operations** - Access user's music library and saved content
+- **Error Handling** - Comprehensive error recovery and graceful degradation
 
-### Via Smithery (Recommended)
+### 📊 Enterprise Features
+- **Health Monitoring** - Real-time health checks and status reporting
+- **Metrics Collection** - Performance tracking and usage analytics
+- **Structured Logging** - Contextual logging with structured output
+- **Dual Storage** - Memory and Redis support for scalability
 
-The easiest way to use this server is through [Smithery](https://smithery.ai/):
+### 🚀 Deployment Ready
+- **Container Support** - Docker deployment with multi-stage builds
+- **Smithery.ai Integration** - Production deployment configuration
+- **Environment Management** - Secure configuration through environment variables
+- **Auto-scaling** - Stateless design enabling horizontal scaling
 
-1. Visit the [YouTube Music MCP Server on Smithery](https://smithery.ai/server/@CaullenOmdahl/youtube-music-mcp-server)
-2. Click "Install" to add it to your MCP client
-3. Configure your YouTube Music headers (see [Getting Your Headers](#getting-your-headers))
+## 🏗️ Architecture
 
-### Local Installation
+The server implements a three-layer architecture:
+
+```
+┌─────────────────────┐
+│   MCP Interface     │  ← FastMCP with 7 tools
+├─────────────────────┤
+│  API Abstraction   │  ← YouTube Music client + rate limiting
+├─────────────────────┤
+│  Authentication    │  ← OAuth 2.1 + PKCE + encryption
+└─────────────────────┘
+```
+
+### Core Components
+
+- **`ytmusic_server/auth/`** - OAuth 2.1 implementation with PKCE
+- **`ytmusic_server/security/`** - Encryption, validation, and middleware
+- **`ytmusic_server/ytmusic/`** - YouTube Music API integration
+- **`ytmusic_server/monitoring/`** - Health checks and metrics
+- **`ytmusic_server/models/`** - Pydantic data models
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Google Cloud Project with YouTube Data API v3 enabled
+- OAuth 2.0 credentials (Client ID and Secret)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/YTMusicPlugin.git
+   cd YTMusicPlugin
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -e .
+   ```
+
+3. **Configure environment**
+   ```bash
+   export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
+   export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+   export ENCRYPTION_KEY="$(python -c 'from ytmusic_server.security.encryption import EncryptionManager; print(EncryptionManager.generate_key())')"
+   ```
+
+4. **Run the server**
+   ```bash
+   python -m ytmusic_server.server
+   ```
+
+## 🔧 MCP Tools
+
+The server provides 7 MCP tools for YouTube Music integration:
+
+### Authentication
+- **`get_auth_status`** - Check authentication status and get OAuth URLs
+
+### Music Discovery
+- **`search_music`** - Search YouTube Music with optional filters
+  ```json
+  {
+    "query": "Taylor Swift",
+    "filter_type": "songs",
+    "limit": 20
+  }
+  ```
+
+### Playlist Management
+- **`get_playlists`** - Get user's playlists
+- **`create_playlist`** - Create new playlists with privacy controls
+- **`get_playlist_details`** - Get detailed playlist information with tracks
+- **`add_songs_to_playlist`** - Add songs to existing playlists
+
+### System Monitoring
+- **`get_server_status`** - Get server health and performance metrics
+
+## 🔐 OAuth 2.1 Flow
+
+The server implements the complete OAuth 2.1 authorization code flow with PKCE:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Google
+
+    Client->>Server: get_auth_status()
+    Server->>Server: Generate PKCE challenge
+    Server-->>Client: auth_url + session_id
+    Client->>Google: Visit auth_url
+    Google-->>Client: Redirect with auth_code
+    Client->>Server: Exchange code for tokens
+    Server->>Google: Token exchange (with PKCE)
+    Google-->>Server: Access + Refresh tokens
+    Server->>Server: Encrypt and store tokens
+    Server-->>Client: Authentication complete
+```
+
+## 🐳 Docker Deployment
+
+```dockerfile
+# Build and run with Docker
+docker build -t ytmusic-mcp .
+docker run -p 8080:8080 \
+  -e GOOGLE_OAUTH_CLIENT_ID="your-client-id" \
+  -e GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret" \
+  -e ENCRYPTION_KEY="your-encryption-key" \
+  ytmusic-mcp
+```
+
+## 🌍 Smithery.ai Deployment
+
+Deploy to Smithery.ai with automatic OAuth configuration:
 
 ```bash
-# Clone the repository
-git clone https://github.com/CaullenOmdahl/youtube-music-mcp-server.git
-cd youtube-music-server
+# Install Smithery CLI
+npm install -g @smithery/cli
 
-# Install dependencies
-pip install -e .
-
-# Run the server
-python -m ytmusic_server
+# Deploy to Smithery.ai
+smithery deploy
 ```
 
-## Authentication Setup
+The `smithery.yaml` configuration includes:
+- OAuth client registration
+- Environment variable schema
+- Container runtime specification
+- Health check endpoints
 
-You can authenticate using either OAuth (recommended) or browser headers.
+## ⚙️ Configuration
 
-### Option 1: OAuth Authentication (Recommended)
+### Environment Variables
 
-OAuth provides persistent authentication that doesn't expire:
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth 2.0 Client ID | Yes | - |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | Yes | - |
+| `ENCRYPTION_KEY` | Base64 encryption key (32 bytes) | Yes | Auto-generated |
+| `REDIS_URL` | Redis connection URL for storage | No | Memory storage |
+| `RATE_LIMIT_PER_MINUTE` | Rate limit per user per minute | No | `60` |
 
-```bash
-# Run the OAuth setup script
-python run_oauth_setup.py
-```
+### Google Cloud Setup
 
-Follow the prompts to:
-1. Visit the authorization URL
-2. Sign in with your Google account
-3. Grant permissions to access YouTube Music
+1. **Create a Google Cloud Project**
+2. **Enable YouTube Data API v3**
+3. **Create OAuth 2.0 credentials**
+   - Application type: Web application
+   - Authorized redirect URIs: `http://localhost:8080/auth/callback`
+4. **Download client credentials**
 
-This creates a `browser.json` file with refresh tokens that the server uses automatically.
+## 📊 Monitoring
 
-### Option 2: Browser Headers
+### Health Endpoints
 
-To use authenticated features (playlist management, library access), you need to provide your YouTube Music request headers. Here's how:
+- **`/health`** - Basic health check
+- **`/health/detailed`** - Comprehensive health status
+- **`/metrics`** - Performance metrics (Prometheus format)
 
-### Method 1: Chrome/Edge/Chromium (Recommended)
+### Structured Logging
 
-1. **Open YouTube Music** - Go to [music.youtube.com](https://music.youtube.com) and sign in
-2. **Open Developer Tools** - Press F12 or right-click → "Inspect"
-3. **Go to Network tab** - Click the "Network" tab in Developer Tools
-4. **Generate a request** - Click around in YouTube Music (play a song, browse, etc.)
-5. **Find a POST request** - Look for requests to `/youtubei/v1/browse` or similar
-   - Filter by "Fetch/XHR" to see only API requests
-   - Look for method "POST"
-6. **Copy Request Headers**
-   - Click on the POST request
-   - In the Headers panel, look for "Request Headers" section
-   - Find the "Raw" toggle or "view source" option and click it
-   - **Copy EVERYTHING** from the first line to the last line
-
-### Method 2: Firefox
-
-1. **Open YouTube Music** and sign in
-2. **Open Developer Tools** (F12) → **Network** tab
-3. **Generate requests** by clicking around
-4. **Find a POST request** to music.youtube.com
-5. **Right-click** the request → Copy → **Copy Request Headers**
-
-### What the Headers Should Look Like
-
-**Chrome format (with :authority, :method, etc.):**
-```
-:authority: music.youtube.com
-:method: POST
-:path: /youtubei/v1/browse?...
-:scheme: https
-accept: */*
-cookie: VISITOR_INFO1_LIVE=...; SID=...; SAPISID=...
-[... many more lines ...]
-x-youtube-client-version: 1.20250922.03.00
-```
-
-**Firefox format (standard HTTP headers):**
-```
-POST /youtubei/v1/browse?... HTTP/3
-Host: music.youtube.com
-Accept: */*
-Cookie: VISITOR_INFO1_LIVE=...; SID=...; SAPISID=...
-[... many more lines ...]
-```
-
-**Important:** Copy ALL headers, including authorization and cookies!
-
-## Configuration
-
-### For Smithery Users
-
-After installing the server on Smithery, configure it with your headers:
-
-1. Click on the server settings in your MCP client
-2. Paste your complete request headers in the `youtube_music_headers` field
-3. Optionally set `default_privacy` to `PRIVATE`, `PUBLIC`, or `UNLISTED`
-4. Save the configuration
-
-### For Local Installation
-
-Create a configuration file or set environment variables:
+All components use structured logging with contextual information:
 
 ```json
 {
-  "youtube_music_headers": "YOUR_COMPLETE_HEADERS_HERE",
-  "default_privacy": "PRIVATE"
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "info",
+  "component": "oauth_manager",
+  "message": "Token refreshed successfully",
+  "session_id": "abc123...",
+  "duration_ms": 245
 }
 ```
 
-## Available Tools
+## 🔒 Security
+
+### Token Security
+- **Encryption**: All tokens encrypted with AES-256
+- **Storage**: Secure storage with automatic cleanup
+- **Refresh**: Automatic token refresh with retry logic
+- **Expiration**: Configurable session timeouts
+
+### Request Security
+- **Rate Limiting**: Per-session and global limits
+- **Input Validation**: Comprehensive input sanitization
+- **CORS**: Configurable cross-origin policies
+- **Headers**: Security headers (HSTS, CSP, etc.)
+
+### Audit & Compliance
+- **Logging**: All authentication events logged
+- **Monitoring**: Real-time security event detection
+- **Standards**: OWASP compliance and OAuth 2.1 standards
+
+## 📚 API Reference
 
 ### Search Music
-Search YouTube Music for content without authentication.
-
-```
-search_music(query, filter?, limit?)
-```
-- `query`: Search terms
-- `filter`: Optional - 'songs', 'videos', 'albums', 'artists', 'playlists', 'uploads'
-- `limit`: Maximum results (default: 20)
-
-### Get Library Playlists
-Get all playlists from your library (requires auth).
-
-```
-get_library_playlists()
-```
-
-### Get Playlist
-Get detailed information about a specific playlist.
-
-```
-get_playlist(playlist_id)
+```python
+# Search for songs
+result = await search_music(
+    query="Bohemian Rhapsody",
+    filter_type="songs",
+    limit=10
+)
 ```
 
 ### Create Playlist
-Create a new playlist in your library.
-
-```
-create_playlist(title, description?, privacy?)
-```
-
-### Add Songs to Playlist
-Add songs to an existing playlist.
-
-```
-add_songs_to_playlist(playlist_id, video_ids)
-```
-
-### Remove Songs from Playlist
-Remove songs from a playlist.
-
-```
-remove_songs_from_playlist(playlist_id, videos)
-```
-
-### Delete Playlist
-Delete a playlist from your library.
-
-```
-delete_playlist(playlist_id)
-```
-
-### Edit Playlist
-Edit playlist metadata.
-
-```
-edit_playlist(playlist_id, title?, description?, privacy?)
-```
-
-
-
-## Usage Examples
-
-### With Claude Desktop
-
-Once configured, you can use natural language commands:
-
-- "Search for songs by The Beatles"
-- "Create a new playlist called 'Workout Mix'"
-- "Add the top 5 songs by Dua Lipa to my Summer Vibes playlist"
-- "Create a playlist called 'Study Jazz' and add relaxing jazz songs"
-- "Show me all my playlists"
-- "Delete my old test playlist"
-
-### With Python Client
-
 ```python
-from mcp_client import MCPClient
-
-client = MCPClient("youtube-music-server")
-
-# Search for music
-results = client.call_tool("search_music", {
-    "query": "Bohemian Rhapsody",
-    "filter": "songs"
-})
-
-# Create a playlist
-playlist = client.call_tool("create_playlist", {
-    "title": "My Awesome Playlist",
-    "description": "Songs I love",
-    "privacy": "PRIVATE"
-})
-
-# Add songs to playlist
-client.call_tool("add_songs_to_playlist", {
-    "playlist_id": playlist["playlist_id"],
-    "video_ids": ["videoId1", "videoId2"]
-})
+# Create a new playlist
+playlist = await create_playlist(
+    name="My Favorites",
+    description="Best songs ever",
+    privacy_status="PRIVATE"
+)
 ```
 
-## Privacy & Security
+### Add Songs
+```python
+# Add songs to playlist
+result = await add_songs_to_playlist(
+    playlist_id="PLrAWu...",
+    video_ids=["dQw4w9WgXcQ", "kJQP7kiw5Fk"]
+)
+```
 
-- **Header Security**: Your headers are stored locally and never transmitted to third parties
-- **Session Isolation**: Each session has its own authentication context
-- **No Password Storage**: We never store or ask for your Google password
-- **Revocable Access**: You can revoke access anytime by signing out of YouTube Music
+## 🧪 Testing
 
-## Troubleshooting
+```bash
+# Install test dependencies
+pip install -e ".[test]"
 
-### "YouTube Music headers not configured"
-- Ensure you've provided your complete request headers in the configuration
-- Check that your headers haven't expired (sign in to YouTube Music again)
-- Verify headers include cookie information and authorization data
+# Run tests
+pytest tests/
 
-### "Authentication required"
-- Some features require authentication even with headers
-- Try refreshing your headers from YouTube Music
+# Run with coverage
+pytest --cov=ytmusic_server tests/
+```
 
-### Search works but playlists don't
-- Playlist operations require valid authentication headers
-- Ensure you're signed in to YouTube Music in your browser
-- Check that your headers include complete cookie and authorization information
+## 🤝 Contributing
 
-### Headers expire frequently
-- YouTube Music headers typically last 2 weeks
-- Sign in with "Remember me" checked for longer-lasting sessions
-- Update headers when you see authentication errors
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
-## Contributing
+### Development Setup
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+```bash
+# Clone and setup development environment
+git clone https://github.com/your-username/YTMusicPlugin.git
+cd YTMusicPlugin
 
-## License
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-MIT License - See [LICENSE](LICENSE) file for details
+# Install in development mode
+pip install -e ".[dev]"
 
-## Acknowledgments
+# Run pre-commit hooks
+pre-commit install
+```
 
-- Built with [ytmusicapi](https://github.com/sigma67/ytmusicapi) by sigma67
-- Implements the [Model Context Protocol](https://modelcontextprotocol.io/)
-- Deployable via [Smithery](https://smithery.ai/)
+## 📝 License
 
-## Support
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-For issues, questions, or suggestions:
-- Open an issue on [GitHub](https://github.com/CaullenOmdahl/youtube-music-mcp-server/issues)
-- Check existing issues for solutions
+## 🙏 Acknowledgments
 
-## Disclaimer
+- **[ytmusicapi](https://github.com/sigma67/ytmusicapi)** - The excellent unofficial YouTube Music API
+- **[Smithery.ai](https://smithery.ai)** - MCP server hosting platform
+- **[FastMCP](https://github.com/pschmidtu/fastmcp)** - Fast MCP server framework
 
-This project is not affiliated with, endorsed by, or connected to YouTube, YouTube Music, or Google. Use at your own risk and in accordance with YouTube's Terms of Service.
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-username/YTMusicPlugin/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-username/YTMusicPlugin/discussions)
+- **Documentation**: [Wiki](https://github.com/your-username/YTMusicPlugin/wiki)
+
+---
+
+**Built with ❤️ for the AI agent ecosystem**
