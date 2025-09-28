@@ -3,7 +3,30 @@ build:
   dockerfile: "Dockerfile"
   dockerBuildPath: "."
 startCommand:
-  type: "http"    🎵 YouTube Music MCP Server
+  type: "http"
+  authentication:
+    type: "oauth2"
+    authorizationEndpoint: "/oauth/authorize"
+    tokenEndpoint: "/oauth/token"
+    refreshEndpoint: "/oauth/refresh"
+    callbackEndpoint: "/oauth/callback"
+  configSchema:
+    type: object
+    required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+    properties:
+      GOOGLE_CLIENT_ID:
+        type: string
+        title: "Google OAuth Client ID"
+        description: "OAuth 2.0 Client ID from Google Cloud Console"
+      GOOGLE_CLIENT_SECRET:
+        type: string
+        title: "Google OAuth Client Secret"
+        description: "OAuth 2.0 Client Secret from Google Cloud Console"
+      OAUTH_REDIRECT_URI:
+        type: string
+        title: "OAuth Redirect URI"
+        description: "OAuth callback URL (auto-configured if not set)"
+        default: "https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback"    🎵 YouTube Music MCP Server
 
     Control your YouTube Music library with natural language! This MCP server provides
     powerful tools to search, create, and manage your YouTube Music playlists.
