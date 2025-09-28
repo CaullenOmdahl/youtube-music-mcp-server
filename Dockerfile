@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Set up Python environment
 WORKDIR /app
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
+COPY ytmusic_server ./ytmusic_server
 
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
@@ -34,9 +35,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY ytmusic_server ./ytmusic_server
-COPY README.md LICENSE* ./
+# Copy application code is already copied in builder stage
+# Just copy any additional files needed at runtime
+COPY README.md ./
 
 # Security: Set ownership and permissions
 RUN chown -R ytmusic:ytmusic /app && \
@@ -59,4 +60,4 @@ ENV PYTHONPATH=/app \
 EXPOSE 8081
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "ytmusic_server.server:app", "--host", "0.0.0.0", "--port", "8081", "--workers", "1"]
+CMD ["python", "-m", "ytmusic_server.server"]
