@@ -1,18 +1,21 @@
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim
 
 # Security: Create non-root user
 RUN groupadd -r ytmusic && useradd -r -g ytmusic ytmusic
 
-# Install system dependencies
+# Install system dependencies (both build and runtime)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libffi-dev \
     libssl-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up Python environment
+# Set up application directory
 WORKDIR /app
+
+# Copy project files
 COPY pyproject.toml README.md ./
 COPY ytmusic_server ./ytmusic_server
 
@@ -20,24 +23,15 @@ COPY ytmusic_server ./ytmusic_server
 RUN pip install --upgrade pip setuptools wheel && \
     pip install .
 
-FROM python:3.12-slim AS runtime
-
-# Security: Create non-root user
-RUN groupadd -r ytmusic && useradd -r -g ytmusic ytmusic
-
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+# Clean up build dependencies to reduce image size
+RUN apt-get purge -y \
+    gcc \
+    g++ \
+    libffi-dev \
+    libssl-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# Set up application directory
-WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Copy application code is already copied in builder stage
-# Just copy any additional files needed at runtime
-COPY README.md ./
 
 # Security: Set ownership and permissions
 RUN chown -R ytmusic:ytmusic /app && \
