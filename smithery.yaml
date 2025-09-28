@@ -11,16 +11,12 @@ startCommand:
       googleClientId:
         type: string
         title: "Google OAuth Client ID"
-        description: "OAuth 2.0 Client ID from Google Cloud Console (get from https://console.cloud.google.com)"
-        format: "password"
+        description: "OAuth 2.0 Client ID from Google Cloud Console (format: xxx.apps.googleusercontent.com)"
       googleClientSecret:
         type: string
         title: "Google OAuth Client Secret"
         description: "OAuth 2.0 Client Secret from Google Cloud Console"
         format: "password"
-  exampleConfig:
-    googleClientId: "your-client-id.apps.googleusercontent.com"
-    googleClientSecret: "your-client-secret"
 env:
   TRANSPORT: "http"
   HOST: "0.0.0.0"
