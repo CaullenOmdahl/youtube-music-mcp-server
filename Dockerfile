@@ -16,9 +16,9 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY ytmusic_server ./ytmusic_server
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+# Install dependencies with cache for faster builds
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install .
 
 FROM python:3.12-slim AS runtime
 
