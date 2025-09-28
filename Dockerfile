@@ -11,8 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py ./
 
-# Set environment variables
+# Set environment variables for HTTP mode
 ENV PORT=8081
+ENV TRANSPORT=http
+ENV HOST=0.0.0.0
 
 # Expose the port
 EXPOSE 8081
