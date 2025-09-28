@@ -47,9 +47,10 @@ def get_smithery_config():
                 pass
 
     # Fall back to environment variables
+    # Smithery sets config values as environment variables
     return {
-        "client_id": os.getenv("GOOGLE_CLIENT_ID", os.getenv("googleClientId", "")),
-        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", os.getenv("googleClientSecret", ""))
+        "client_id": os.getenv("googleClientId", os.getenv("GOOGLE_CLIENT_ID", "")),
+        "client_secret": os.getenv("googleClientSecret", os.getenv("GOOGLE_CLIENT_SECRET", ""))
     }
 
 # OAuth configuration
@@ -62,6 +63,13 @@ OAUTH_CONFIG = {
     "token_uri": "https://oauth2.googleapis.com/token",
     "scope": "https://www.googleapis.com/auth/youtube"
 }
+
+# Log OAuth configuration status
+if OAUTH_CONFIG["client_id"] and OAUTH_CONFIG["client_secret"]:
+    logger.info(f"OAuth configured with client_id: {OAUTH_CONFIG['client_id'][:30]}...")
+else:
+    logger.warning("OAuth credentials not configured. YouTube Music features require authentication.")
+    logger.warning("Configure googleClientId and googleClientSecret in Smithery or set as environment variables")
 
 # In-memory storage for OAuth tokens (use a database in production)
 oauth_tokens = {}
