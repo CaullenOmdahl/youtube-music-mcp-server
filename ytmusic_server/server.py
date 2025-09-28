@@ -76,8 +76,14 @@ class YouTubeMusicMCPServer:
         # Register health checks
         self._register_health_checks()
 
-        # MCP server
-        self.mcp = FastMCP("YouTube Music MCP Server")
+        # MCP server with HTTP configuration
+        port = int(os.getenv("PORT", "8081"))
+        self.mcp = FastMCP(
+            name="YouTube Music MCP Server",
+            host="0.0.0.0",
+            port=port,
+            streamable_http_path="/mcp"
+        )
         self._register_tools()
 
         self.logger.info("YouTube Music MCP Server initialized")
@@ -391,6 +397,32 @@ class YouTubeMusicMCPServer:
                 self.logger.error("Get playlist details failed", playlist_id=playlist_id, error=str(e))
                 return {"success": False, "error": str(e)}
 
+        # Health check endpoint (for Docker/Smithery)
+        @self.mcp.tool()
+        async def health_check() -> Dict[str, Any]:
+            """
+            Health check endpoint for monitoring and load balancers.
+
+            Returns:
+                Server health status
+            """
+            try:
+                health_status = await self.health_checker.get_health_status()
+                return {
+                    "status": "healthy",
+                    "service": "YouTube Music MCP Server",
+                    "version": "2.0.0",
+                    "health": health_status,
+                    "timestamp": asyncio.get_event_loop().time(),
+                }
+            except Exception as e:
+                self.logger.error("Health check failed", error=str(e))
+                return {
+                    "status": "unhealthy",
+                    "error": str(e),
+                    "timestamp": asyncio.get_event_loop().time(),
+                }
+
         # System tools
         @self.mcp.tool()
         async def get_server_status() -> Dict[str, Any]:
@@ -511,9 +543,6 @@ def create_server() -> YouTubeMusicMCPServer:
 # For direct usage
 if __name__ == "__main__":
     import uvicorn
-    from fastapi import FastAPI, Request
-    from fastapi.responses import JSONResponse
-    import urllib.parse
 
     # Configure structured logging
     structlog.configure(
@@ -528,74 +557,27 @@ if __name__ == "__main__":
         cache_logger_on_first_use=True,
     )
 
-    # Create FastAPI app
-    app = FastAPI(title="YouTube Music MCP Server")
+    def main():
+        # Create server instance
+        server = create_server()
 
-    # Global server instance
-    mcp_server = None
+        # Start async components
+        async def startup():
+            await server.start()
 
-    @app.on_event("startup")
-    async def startup_event():
-        global mcp_server
-        # Parse configuration from environment variables (Smithery style)
-        config = ServerConfig(
-            oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
-            oauth_client_secret=os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
-            encryption_key=os.getenv("ENCRYPTION_KEY") or EncryptionManager.generate_key(),
-            redis_url=os.getenv("REDIS_URL"),
-            rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
-        )
+        # Cleanup async components
+        async def cleanup():
+            await server.stop()
 
-        mcp_server = YouTubeMusicMCPServer(config)
-        await mcp_server.start()
+        # Run startup
+        asyncio.run(startup())
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        if mcp_server:
-            await mcp_server.stop()
+        try:
+            # Run FastMCP with streamable-http transport
+            server.mcp.run(transport="streamable-http")
 
-    @app.get("/health")
-    async def health_check():
-        """Health check endpoint for Docker and Smithery."""
-        return {"status": "healthy", "service": "YouTube Music MCP Server"}
+        finally:
+            # Run cleanup
+            asyncio.run(cleanup())
 
-    # Mount FastMCP's streamable HTTP app at /mcp
-    def create_mcp_app():
-        if mcp_server:
-            return mcp_server.mcp.streamable_http_app
-        return None
-
-    @app.middleware("http")
-    async def config_middleware(request: Request, call_next):
-        """Parse Smithery configuration from query parameters."""
-        if request.url.path.startswith("/mcp"):
-            query_params = dict(request.query_params)
-
-            # Update environment with query parameters (dot notation support)
-            for key, value in query_params.items():
-                if key == "oauth_client_id":
-                    os.environ["GOOGLE_OAUTH_CLIENT_ID"] = value
-                elif key == "oauth_client_secret":
-                    os.environ["GOOGLE_OAUTH_CLIENT_SECRET"] = value
-                elif key == "encryption_key":
-                    os.environ["ENCRYPTION_KEY"] = value
-                elif key == "redis_url":
-                    os.environ["REDIS_URL"] = value
-                elif key == "rate_limit_per_minute":
-                    os.environ["RATE_LIMIT_PER_MINUTE"] = value
-
-        response = await call_next(request)
-        return response
-
-    # Mount the MCP streamable HTTP app
-    @app.on_event("startup")
-    async def mount_mcp():
-        """Mount MCP app after server is initialized."""
-        await asyncio.sleep(0.1)  # Wait for startup_event to complete
-        if mcp_server:
-            mcp_app = mcp_server.mcp.streamable_http_app
-            app.mount("/mcp", mcp_app)
-
-    # Run the HTTP server
-    port = int(os.getenv("PORT", "8081"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    main()
