@@ -85,6 +85,7 @@ class YouTubeMusicMCPServer:
             streamable_http_path="/mcp"
         )
         self._register_tools()
+        self._register_health_endpoints()
 
         self.logger.info("YouTube Music MCP Server initialized")
 
@@ -92,6 +93,30 @@ class YouTubeMusicMCPServer:
         """Register health check functions."""
         self.health_checker.register_check("ytmusic_api", self.health_checker.check_ytmusic_api)
         self.health_checker.register_check("memory", self.health_checker.check_memory_usage)
+
+    def _register_health_endpoints(self) -> None:
+        """Register HTTP health check endpoints."""
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+
+        @self.mcp.custom_route("/health", methods=["GET"])
+        async def health_endpoint(request: Request) -> JSONResponse:
+            """Health check endpoint for Docker and load balancers."""
+            try:
+                health_status = await self.health_checker.get_health_status()
+                return JSONResponse({
+                    "status": "healthy",
+                    "service": "YouTube Music MCP Server",
+                    "version": "2.0.0",
+                    "health": health_status,
+                    "timestamp": asyncio.get_event_loop().time(),
+                })
+            except Exception as e:
+                self.logger.error("Health endpoint error", error=str(e))
+                return JSONResponse(
+                    {"status": "unhealthy", "error": str(e)},
+                    status_code=503
+                )
 
     def _register_tools(self) -> None:
         """Register MCP tools."""
