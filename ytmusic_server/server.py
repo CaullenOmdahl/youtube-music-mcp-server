@@ -606,19 +606,21 @@ if __name__ == "__main__":
         async def startup():
             await server.start()
 
-        # Cleanup async components
-        async def cleanup():
-            await server.stop()
-
         # Run startup
-        asyncio.run(startup())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(startup())
 
         try:
-            # Run FastMCP with streamable-http transport
+            # Run FastMCP with streamable-http transport (blocking call)
             server.mcp.run(transport="streamable-http")
 
         finally:
             # Run cleanup
-            asyncio.run(cleanup())
+            async def cleanup():
+                await server.stop()
+
+            loop.run_until_complete(cleanup())
+            loop.close()
 
     main()
