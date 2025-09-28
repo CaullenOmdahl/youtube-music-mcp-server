@@ -28,10 +28,35 @@ logger = logging.getLogger(__name__)
 # Initialize FastMCP server
 mcp = FastMCP(name="YouTube Music MCP")
 
+# Function to get config from Smithery
+def get_smithery_config():
+    """Get configuration from Smithery's config parameter or environment variables"""
+    # Try to get from Smithery's base64-encoded config parameter
+    import sys
+    for arg in sys.argv:
+        if arg.startswith('--config='):
+            try:
+                import base64
+                config_str = arg.split('=', 1)[1]
+                config_data = json.loads(base64.b64decode(config_str).decode())
+                return {
+                    "client_id": config_data.get("googleClientId", ""),
+                    "client_secret": config_data.get("googleClientSecret", "")
+                }
+            except:
+                pass
+
+    # Fall back to environment variables
+    return {
+        "client_id": os.getenv("GOOGLE_CLIENT_ID", os.getenv("googleClientId", "")),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", os.getenv("googleClientSecret", ""))
+    }
+
 # OAuth configuration
+smithery_config = get_smithery_config()
 OAUTH_CONFIG = {
-    "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-    "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
+    "client_id": smithery_config["client_id"],
+    "client_secret": smithery_config["client_secret"],
     "redirect_uri": os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8081/oauth/callback"),
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
     "token_uri": "https://oauth2.googleapis.com/token",
