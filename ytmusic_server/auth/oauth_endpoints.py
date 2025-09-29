@@ -15,6 +15,7 @@ from starlette.routing import Route
 import structlog
 
 from .resource_metadata import ResourceMetadataHandler
+from ..config import config
 
 logger = structlog.get_logger(__name__)
 
@@ -22,12 +23,17 @@ logger = structlog.get_logger(__name__)
 class OAuthEndpoints:
     """OAuth 2.0 authorization server endpoints."""
 
-    def __init__(self, server_url: str, youtube_oauth_config: Dict[str, str]):
-        self.server_url = server_url
-        self.auth_server_url = f"{server_url}/oauth"
+    def __init__(self, youtube_oauth_config: Dict[str, str]):
         self.youtube_config = youtube_oauth_config
-        self.metadata_handler = ResourceMetadataHandler(server_url, self.auth_server_url)
+        self.metadata_handler = ResourceMetadataHandler(config.base_url, config.base_url)
         self.logger = logger.bind(component="oauth_endpoints")
+
+        # Log configuration
+        self.logger.info(
+            "OAuth endpoints initialized",
+            base_url=config.base_url,
+            platform=config.get_platform_info()["platform"]
+        )
 
         # In-memory storage for development (use Redis/DB in production)
         self.clients = {}
@@ -41,7 +47,24 @@ class OAuthEndpoints:
 
     async def authorization_server_metadata(self, request: Request) -> JSONResponse:
         """OAuth Authorization Server Metadata endpoint."""
-        metadata = self.metadata_handler.get_authorization_server_metadata()
+        metadata = config.oauth_config
+        metadata.update({
+            "scopes_supported": [
+                "mcp:tools",
+                "youtube:readonly",
+                "youtube:manage_playlists"
+            ],
+            "response_types_supported": ["code"],
+            "grant_types_supported": [
+                "authorization_code",
+                "refresh_token"
+            ],
+            "token_endpoint_auth_methods_supported": [
+                "client_secret_post",
+                "client_secret_basic"
+            ],
+            "code_challenge_methods_supported": ["S256"]
+        })
         return JSONResponse(metadata)
 
     async def jwks(self, request: Request) -> JSONResponse:

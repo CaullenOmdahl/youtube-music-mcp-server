@@ -5,6 +5,7 @@ Implements transport-level OAuth authentication with proper WWW-Authenticate
 headers and token validation.
 """
 
+import os
 import re
 from typing import Optional, Dict, Any
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -12,17 +13,26 @@ from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 import structlog
 
+from ..config import config
+
 logger = structlog.get_logger(__name__)
 
 
 class OAuthMiddleware(BaseHTTPMiddleware):
     """OAuth 2.0 authentication middleware for MCP transport."""
 
-    def __init__(self, app, server_url: str, auth_server_url: str = None):
+    def __init__(self, app):
         super().__init__(app)
-        self.server_url = server_url
-        self.auth_server_url = auth_server_url or f"{server_url}/oauth"
         self.logger = logger.bind(component="oauth_middleware")
+
+        # Allow bypass for testing
+        self.bypass_auth = os.getenv("BYPASS_AUTH_FOR_TESTING", "false").lower() == "true"
+        if self.bypass_auth:
+            self.logger.warning("OAuth bypass enabled for testing - DO NOT USE IN PRODUCTION")
+
+        # Log platform configuration
+        platform_info = config.get_platform_info()
+        self.logger.info("OAuth middleware initialized", **platform_info)
 
         # Paths that don't require authentication
         self.public_paths = {
@@ -42,6 +52,21 @@ class OAuthMiddleware(BaseHTTPMiddleware):
 
         # Skip authentication for public endpoints
         if request.url.path in self.public_paths:
+            return await call_next(request)
+
+        # Bypass auth for testing if enabled
+        if self.bypass_auth and request.client.host in ["127.0.0.1", "::1"]:
+            self.logger.info("Bypassing OAuth for local testing", client_host=request.client.host)
+            # Set mock token info for tools
+            request.state.oauth_token = {
+                "sub": "test-user",
+                "scope": "mcp:tools youtube:readonly",
+                "exp": 9999999999,
+                "iss": config.base_url,
+                "aud": config.base_url
+            }
+            request.state.user_id = "test-user"
+            request.state.scopes = ["mcp:tools", "youtube:readonly"]
             return await call_next(request)
 
         # Extract and validate bearer token
@@ -102,16 +127,19 @@ class OAuthMiddleware(BaseHTTPMiddleware):
     def _unauthorized_response(self, error: str) -> Response:
         """Return 401 response with WWW-Authenticate header."""
 
+        resource_metadata_url = config.get_endpoint_url("/.well-known/oauth-protected-resource")
+
         www_authenticate = (
             f'Bearer realm="youtube-music", '
-            f'resource_metadata="{self.server_url}/.well-known/oauth-protected-resource", '
+            f'resource_metadata="{resource_metadata_url}", '
             f'error="{error}"'
         )
 
         self.logger.info(
             "Returning 401 unauthorized",
             error=error,
-            auth_header=www_authenticate
+            auth_header=www_authenticate,
+            resource_metadata_url=resource_metadata_url
         )
 
         return JSONResponse(
@@ -119,7 +147,7 @@ class OAuthMiddleware(BaseHTTPMiddleware):
             content={
                 "error": "unauthorized",
                 "error_description": f"Authentication required: {error}",
-                "resource_metadata_url": f"{self.server_url}/.well-known/oauth-protected-resource"
+                "resource_metadata_url": resource_metadata_url
             },
             headers={
                 "WWW-Authenticate": www_authenticate,

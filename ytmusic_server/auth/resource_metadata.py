@@ -10,6 +10,8 @@ from typing import Dict, List, Any
 from pydantic import BaseModel, AnyHttpUrl
 import structlog
 
+from ..config import config
+
 logger = structlog.get_logger(__name__)
 
 
@@ -26,9 +28,8 @@ class ProtectedResourceMetadata(BaseModel):
 class ResourceMetadataHandler:
     """Handles Protected Resource Metadata discovery."""
 
-    def __init__(self, server_url: str, auth_server_url: str = None):
-        self.server_url = server_url
-        self.auth_server_url = auth_server_url or f"{server_url}/oauth"
+    def __init__(self, server_url: str = None, auth_server_url: str = None):
+        # Use config URLs, ignore parameters for backward compatibility
         self.logger = logger.bind(component="resource_metadata")
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -39,8 +40,8 @@ class ResourceMetadataHandler:
             Protected Resource Metadata as dict
         """
         metadata = ProtectedResourceMetadata(
-            resource=self.server_url,
-            authorization_servers=[self.auth_server_url],
+            resource=config.base_url,
+            authorization_servers=[config.base_url],
             scopes_supported=[
                 "mcp:tools",
                 "youtube:readonly",
@@ -50,8 +51,9 @@ class ResourceMetadataHandler:
 
         self.logger.info(
             "Generated protected resource metadata",
-            resource=self.server_url,
-            auth_servers=len(metadata.authorization_servers)
+            resource=config.base_url,
+            auth_servers=len(metadata.authorization_servers),
+            platform=config.get_platform_info()["platform"]
         )
 
         return metadata.model_dump(mode='json')

@@ -615,16 +615,15 @@ if __name__ == "__main__":
         # Get the Starlette app from FastMCP
         mcp_app = server.mcp.streamable_http_app()
 
-        # Get port and server URL
+        # Get port
         port = int(os.getenv("PORT", "8081"))
-        server_url = os.getenv("SERVER_URL", f"http://localhost:{port}")
 
-        # Create OAuth endpoints
+        # Create OAuth endpoints with config awareness
         youtube_oauth_config = {
             "client_id": os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
             "client_secret": os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
         }
-        oauth_endpoints = OAuthEndpoints(server_url, youtube_oauth_config)
+        oauth_endpoints = OAuthEndpoints(youtube_oauth_config)
 
         # Create main application with OAuth routes
         app = Starlette(routes=oauth_endpoints.get_routes() + [
@@ -632,10 +631,7 @@ if __name__ == "__main__":
         ])
 
         # Add OAuth middleware (only for /mcp routes)
-        app.add_middleware(
-            OAuthMiddleware,
-            server_url=server_url
-        )
+        app.add_middleware(OAuthMiddleware)
 
         # Add CORS middleware for browser based clients
         app.add_middleware(
