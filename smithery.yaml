@@ -4,6 +4,23 @@ build:
   dockerBuildPath: "."
 startCommand:
   type: "http"
+  oauth:
+    enabled: true
+    metadata:
+      resource_metadata: "/.well-known/oauth-protected-resource"
+      authorization_server: "/.well-known/oauth-authorization-server"
+    endpoints:
+      authorize: "/oauth/authorize"
+      token: "/oauth/token"
+      register: "/oauth/register"
+    scopes:
+      - "mcp:tools"
+      - "youtube:readonly"
+      - "youtube:manage_playlists"
+    features:
+      - "dynamic_client_registration"
+      - "pkce_required"
+      - "refresh_tokens"
   configSchema:
     type: "object"
     properties:
@@ -16,6 +33,11 @@ startCommand:
         title: "Google OAuth Client Secret"
         description: "OAuth 2.1 client secret from Google Cloud Console"
         format: "password"
+      server_url:
+        type: "string"
+        title: "Server URL"
+        description: "Public URL of the MCP server (auto-detected if not provided)"
+        default: ""
       redis_url:
         type: "string"
         title: "Redis Connection URL"
@@ -37,6 +59,7 @@ startCommand:
   exampleConfig:
     oauth_client_id: "your-client-id.googleusercontent.com"
     oauth_client_secret: "GOCSPX-your-client-secret"
+    server_url: "https://your-server.smithery.ai"
     encryption_key: "base64-encoded-32-byte-key"
     redis_url: "redis://localhost:6379"
     rate_limit_per_minute: 60
