@@ -50,6 +50,9 @@ class OAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Process OAuth authentication for requests."""
 
+        # Set request context for URL detection
+        config.set_request_context(request)
+
         # Skip authentication for public endpoints
         if request.url.path in self.public_paths:
             return await call_next(request)

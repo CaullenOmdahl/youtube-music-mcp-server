@@ -6,6 +6,7 @@ on Smithery or other proxy platforms.
 """
 
 import os
+from typing import Optional
 from urllib.parse import urljoin, urlparse
 import structlog
 
@@ -17,6 +18,11 @@ class ServerConfig:
 
     def __init__(self):
         self.logger = logger.bind(component="server_config")
+        self._current_request = None
+
+    def set_request_context(self, request):
+        """Set current request for URL detection."""
+        self._current_request = request
 
     @property
     def base_url(self) -> str:
@@ -32,19 +38,25 @@ class ServerConfig:
             self.logger.info("Using explicit PUBLIC_URL", url=url)
             return url
 
-        # 2. Smithery platform detection
+        # 2. Request context detection (new approach)
+        request_url = self._detect_from_request_context()
+        if request_url:
+            self.logger.info("Detected URL from request context", url=request_url)
+            return request_url
+
+        # 3. Smithery platform detection
         smithery_url = self._detect_smithery_url()
         if smithery_url:
             self.logger.info("Detected Smithery platform", url=smithery_url)
             return smithery_url
 
-        # 3. Generic proxy detection
+        # 4. Generic proxy detection
         proxy_url = self._detect_proxy_url()
         if proxy_url:
             self.logger.info("Detected proxy environment", url=proxy_url)
             return proxy_url
 
-        # 4. Local development fallback
+        # 5. Local development fallback
         port = os.getenv("PORT", "8081")
         fallback_url = f"http://localhost:{port}"
         self.logger.info("Using local development URL", url=fallback_url)
@@ -76,6 +88,56 @@ class ServerConfig:
             return f"{forwarded_proto}://{forwarded_host}{forwarded_prefix}"
 
         return ""
+
+    def _detect_from_request_context(self) -> str:
+        """
+        Detect URL from current request context (headers).
+
+        Returns:
+            Request-based URL or empty string if not available
+        """
+        if not self._current_request:
+            return ""
+
+        try:
+            # Check for forwarded headers first (proxy/reverse proxy setup)
+            host = (self._current_request.headers.get("x-forwarded-host") or
+                   self._current_request.headers.get("forwarded-host") or
+                   self._current_request.headers.get("host"))
+
+            if not host:
+                return ""
+
+            # Determine protocol
+            proto = (self._current_request.headers.get("x-forwarded-proto") or
+                    self._current_request.headers.get("forwarded-proto"))
+
+            if not proto:
+                # Default to https for non-localhost, http for localhost
+                proto = "https" if not host.startswith("localhost") and not host.startswith("127.0.0.1") else "http"
+
+            # Get path prefix if any
+            prefix = (self._current_request.headers.get("x-forwarded-prefix") or
+                     self._current_request.headers.get("forwarded-prefix") or "")
+
+            url = f"{proto}://{host}{prefix}"
+
+            # Special handling for Smithery - detect if this looks like a Smithery URL
+            if "smithery.ai" in host.lower():
+                self.logger.info("Detected Smithery URL from request headers", url=url, host=host)
+                return url
+
+            # For other proxy setups
+            if any(header in self._current_request.headers for header in
+                  ["x-forwarded-host", "forwarded-host", "x-forwarded-proto"]):
+                self.logger.info("Detected proxy URL from request headers", url=url, host=host)
+                return url
+
+            return ""
+
+        except Exception as e:
+            self.logger.warning("Failed to detect URL from request context", error=str(e))
+            return ""
 
     def _detect_proxy_url(self) -> str:
         """

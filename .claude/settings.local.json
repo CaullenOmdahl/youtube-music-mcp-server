@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(BYPASS_AUTH_FOR_TESTING=true PORT=8084 python3 -m ytmusic_server.server)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

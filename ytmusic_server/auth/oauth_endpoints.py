@@ -42,11 +42,13 @@ class OAuthEndpoints:
 
     async def protected_resource_metadata(self, request: Request) -> JSONResponse:
         """RFC 9728 Protected Resource Metadata endpoint."""
+        config.set_request_context(request)
         metadata = self.metadata_handler.get_metadata()
         return JSONResponse(metadata)
 
     async def authorization_server_metadata(self, request: Request) -> JSONResponse:
         """OAuth Authorization Server Metadata endpoint."""
+        config.set_request_context(request)
         metadata = config.oauth_config
         metadata.update({
             "scopes_supported": [
