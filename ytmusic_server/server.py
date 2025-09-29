@@ -599,17 +599,36 @@ if __name__ == "__main__":
     )
 
     def main():
+        import uvicorn
+        from starlette.middleware.cors import CORSMiddleware
+
         # Create server instance
         server = create_server()
 
-        # Start server components synchronously
+        # Start server components
         asyncio.run(server.start())
 
-        try:
-            # Run FastMCP with streamable-http transport
-            server.mcp.run(transport="streamable-http")
-        finally:
-            # Cleanup
-            asyncio.run(server.stop())
+        # Get the Starlette app from FastMCP
+        app = server.mcp.streamable_http_app()
+
+        # Add CORS middleware for browser based clients
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["mcp-session-id", "mcp-protocol-version"],
+            max_age=86400,
+        )
+
+        # Get port from environment variable
+        port = int(os.getenv("PORT", "8081"))
+
+        logger = structlog.get_logger()
+        logger.info(f"Starting YouTube Music MCP Server on port {port}")
+
+        # Run with uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
 
     main()
