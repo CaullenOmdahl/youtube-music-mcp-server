@@ -170,6 +170,143 @@ class YouTubeMusicMCPServer:
                 self.logger.error("Error checking auth status", error=str(e))
                 return {"error": str(e), "authenticated": False}
 
+        # OAuth authentication tools
+        @self.mcp.tool()
+        async def start_oauth(
+            session_id: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """
+            Start OAuth authentication flow.
+
+            Args:
+                session_id: Optional existing session ID to reuse
+
+            Returns:
+                OAuth authorization URL and session information
+            """
+            try:
+                # Create or retrieve session
+                if session_id:
+                    session = await self.session_manager.get_session(session_id)
+                    if not session:
+                        # Create new session if provided ID doesn't exist
+                        session = await self.session_manager.create_session()
+                else:
+                    session = await self.session_manager.create_session()
+
+                # Generate PKCE challenge
+                from ytmusic_server.models.auth import PKCEChallenge
+                pkce_challenge = PKCEChallenge.generate()
+
+                # Generate authorization URL with session_id as state
+                auth_url = self.oauth_manager.generate_auth_url(
+                    pkce_challenge=pkce_challenge,
+                    state=session.session_id
+                )
+
+                # Store PKCE challenge in session
+                session.pkce_challenge = pkce_challenge
+                await self.session_manager.update_session(session)
+
+                self.logger.info("OAuth flow started", session_id=session.session_id)
+
+                return {
+                    "success": True,
+                    "auth_url": auth_url,
+                    "session_id": session.session_id,
+                    "state": session.session_id,
+                    "message": "Visit the authorization URL to authenticate"
+                }
+
+            except Exception as e:
+                self.logger.error("Error starting OAuth flow", error=str(e))
+                return {"success": False, "error": str(e)}
+
+        @self.mcp.tool()
+        async def complete_oauth(
+            code: str,
+            state: str,
+            session_id: str
+        ) -> Dict[str, Any]:
+            """
+            Complete OAuth authentication by exchanging authorization code for tokens.
+
+            Args:
+                code: Authorization code from OAuth callback
+                state: State parameter for CSRF validation
+                session_id: Session ID from start_oauth
+
+            Returns:
+                Authentication completion status
+            """
+            try:
+                # Retrieve session
+                session = await self.session_manager.get_session(session_id)
+                if not session:
+                    return {
+                        "success": False,
+                        "error": "Session not found"
+                    }
+
+                # Validate state (should match session_id)
+                if session.session_id != state:
+                    self.logger.warning(
+                        "OAuth state mismatch",
+                        expected=session.session_id,
+                        received=state
+                    )
+                    return {
+                        "success": False,
+                        "error": "Invalid state parameter"
+                    }
+
+                # Validate PKCE challenge exists
+                if not session.pkce_challenge:
+                    return {
+                        "success": False,
+                        "error": "PKCE challenge not found in session"
+                    }
+
+                # Exchange code for tokens
+                oauth_token = await self.oauth_manager.exchange_code_for_token(
+                    authorization_code=code,
+                    pkce_challenge=session.pkce_challenge,
+                    state=state
+                )
+
+                # Store encrypted tokens
+                session.oauth_token = oauth_token
+                session.state = AuthState.AUTHENTICATED
+                await self.session_manager.update_session(session)
+
+                # Record metrics
+                self.metrics_collector.record_oauth_flow_completion(
+                    session.session_id, True
+                )
+
+                self.logger.info(
+                    "OAuth authentication completed",
+                    session_id=session.session_id
+                )
+
+                return {
+                    "success": True,
+                    "authenticated": True,
+                    "session_id": session.session_id,
+                    "message": "Authentication successful"
+                }
+
+            except Exception as e:
+                if session_id:
+                    self.metrics_collector.record_oauth_flow_completion(
+                        session_id, False, str(type(e).__name__)
+                    )
+                self.logger.error("Error completing OAuth flow", error=str(e))
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+
         # YouTube Music search
         @self.mcp.tool()
         async def search_music(
