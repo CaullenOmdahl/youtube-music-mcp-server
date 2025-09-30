@@ -61,9 +61,6 @@ class YouTubeMusicMCPServer:
         port = int(os.getenv("PORT", "8081"))
         self.mcp = FastMCP(
             name="YouTube Music MCP Server",
-            host="0.0.0.0",
-            port=port,
-            streamable_http_path="/mcp",
         )
         self._register_tools()
         self._register_health_endpoints()
@@ -392,7 +389,8 @@ if __name__ == "__main__":
         import uvicorn
         from starlette.middleware.cors import CORSMiddleware
         from starlette.applications import Starlette
-        from starlette.routing import Mount
+        from starlette.routing import Mount, Route
+        from starlette.responses import JSONResponse
 
         # Create server instance
         server = create_server()
@@ -403,10 +401,150 @@ if __name__ == "__main__":
         # Get port
         port = int(os.getenv("PORT", "8081"))
 
+        # Health endpoint for the main app
+        async def health_endpoint(request):
+            """Health check endpoint for Docker and load balancers."""
+            try:
+                health_status = await server.health_checker.get_health_status()
+                return JSONResponse(
+                    {
+                        "status": "healthy",
+                        "service": "YouTube Music MCP Server",
+                        "version": "2.0.0",
+                        "health": health_status,
+                        "timestamp": asyncio.get_event_loop().time(),
+                    }
+                )
+            except Exception as e:
+                server.logger.error("Health endpoint error", error=str(e))
+                return JSONResponse(
+                    {"status": "unhealthy", "error": str(e)}, status_code=503
+                )
+
+        # MCP JSON-RPC endpoint
+        async def mcp_endpoint(request):
+            """Handle MCP JSON-RPC requests directly."""
+            try:
+                body = await request.json()
+
+                # Handle initialize request
+                if body.get("method") == "initialize":
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": body.get("id"),
+                            "result": {
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {
+                                    "tools": {},
+                                    "logging": {},
+                                    "sampling": {},
+                                },
+                                "serverInfo": {
+                                    "name": "YouTube Music MCP Server",
+                                    "version": "2.0.0",
+                                },
+                            },
+                        }
+                    )
+
+                # Handle tools/list request
+                elif body.get("method") == "tools/list":
+                    tools = []
+                    for tool in server.mcp._tools:
+                        tools.append(
+                            {
+                                "name": tool.name,
+                                "description": tool.description or "",
+                                "inputSchema": tool.parameters or {},
+                            }
+                        )
+
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": body.get("id"),
+                            "result": {"tools": tools},
+                        }
+                    )
+
+                # Handle tool calls
+                elif body.get("method") == "tools/call":
+                    params = body.get("params", {})
+                    tool_name = params.get("name")
+                    arguments = params.get("arguments", {})
+
+                    # Find and call the tool
+                    for tool in server.mcp._tools:
+                        if tool.name == tool_name:
+                            try:
+                                result = await tool.handler(**arguments)
+                                return JSONResponse(
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": body.get("id"),
+                                        "result": {
+                                            "content": [
+                                                {"type": "text", "text": str(result)}
+                                            ]
+                                        },
+                                    }
+                                )
+                            except Exception as e:
+                                return JSONResponse(
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": body.get("id"),
+                                        "error": {
+                                            "code": -32603,
+                                            "message": f"Tool execution failed: {str(e)}",
+                                        },
+                                    }
+                                )
+
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": body.get("id"),
+                            "error": {
+                                "code": -32601,
+                                "message": f"Tool not found: {tool_name}",
+                            },
+                        }
+                    )
+
+                else:
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": body.get("id"),
+                            "error": {
+                                "code": -32601,
+                                "message": f"Method not found: {body.get('method')}",
+                            },
+                        }
+                    )
+
+            except Exception as e:
+                server.logger.error("MCP endpoint error", error=str(e))
+                return JSONResponse(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": body.get("id") if hasattr(body, "get") else None,
+                        "error": {
+                            "code": -32603,
+                            "message": f"Internal error: {str(e)}",
+                        },
+                    },
+                    status_code=500,
+                )
+
         # Create simple application - no OAuth server needed since users provide their own credentials
         app = Starlette(
             routes=[
-                Mount("/mcp", mcp_app),
+                Route("/health", health_endpoint, methods=["GET"]),
+                Route("/mcp", mcp_endpoint, methods=["POST"]),
+                Route("/mcp/", mcp_endpoint, methods=["POST"]),  # Handle trailing slash
             ]
         )
 
