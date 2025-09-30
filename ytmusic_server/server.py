@@ -47,12 +47,16 @@ class YouTubeMusicMCPServer:
 
         # Initialize token storage
         if config.redis_url:
-            self.token_storage = RedisTokenStorage(self.encryption_manager, config.redis_url)
+            self.token_storage = RedisTokenStorage(
+                self.encryption_manager, config.redis_url
+            )
         else:
             self.token_storage = MemoryTokenStorage(self.encryption_manager)
 
         # Initialize managers
-        self.session_manager = SessionManager(self.token_storage, config.security_config)
+        self.session_manager = SessionManager(
+            self.token_storage, config.security_config
+        )
         self.oauth_manager = OAuthManager(config.oauth_config, self.token_storage)
 
         # Initialize security components
@@ -82,7 +86,7 @@ class YouTubeMusicMCPServer:
             name="YouTube Music MCP Server",
             host="0.0.0.0",
             port=port,
-            streamable_http_path="/mcp"
+            streamable_http_path="/mcp",
         )
         self._register_tools()
         self._register_health_endpoints()
@@ -91,8 +95,12 @@ class YouTubeMusicMCPServer:
 
     def _register_health_checks(self) -> None:
         """Register health check functions."""
-        self.health_checker.register_check("ytmusic_api", self.health_checker.check_ytmusic_api)
-        self.health_checker.register_check("memory", self.health_checker.check_memory_usage)
+        self.health_checker.register_check(
+            "ytmusic_api", self.health_checker.check_ytmusic_api
+        )
+        self.health_checker.register_check(
+            "memory", self.health_checker.check_memory_usage
+        )
 
     def _register_health_endpoints(self) -> None:
         """Register HTTP health check endpoints."""
@@ -104,18 +112,19 @@ class YouTubeMusicMCPServer:
             """Health check endpoint for Docker and load balancers."""
             try:
                 health_status = await self.health_checker.get_health_status()
-                return JSONResponse({
-                    "status": "healthy",
-                    "service": "YouTube Music MCP Server",
-                    "version": "2.0.0",
-                    "health": health_status,
-                    "timestamp": asyncio.get_event_loop().time(),
-                })
+                return JSONResponse(
+                    {
+                        "status": "healthy",
+                        "service": "YouTube Music MCP Server",
+                        "version": "2.0.0",
+                        "health": health_status,
+                        "timestamp": asyncio.get_event_loop().time(),
+                    }
+                )
             except Exception as e:
                 self.logger.error("Health endpoint error", error=str(e))
                 return JSONResponse(
-                    {"status": "unhealthy", "error": str(e)},
-                    status_code=503
+                    {"status": "unhealthy", "error": str(e)}, status_code=503
                 )
 
     def _register_tools(self) -> None:
@@ -176,7 +185,7 @@ class YouTubeMusicMCPServer:
             query: str,
             session_id: Optional[str] = None,
             filter_type: Optional[str] = None,
-            limit: int = 20
+            limit: int = 20,
         ) -> Dict[str, Any]:
             """
             Search for music on YouTube Music.
@@ -194,7 +203,9 @@ class YouTubeMusicMCPServer:
 
             try:
                 # Validate session and get OAuth token
-                session, oauth_token = await self._validate_session_and_token(session_id)
+                session, oauth_token = await self._validate_session_and_token(
+                    session_id
+                )
 
                 # Perform search
                 results = await self.ytmusic_client.search_music(
@@ -218,7 +229,11 @@ class YouTubeMusicMCPServer:
                 duration = asyncio.get_event_loop().time() - start_time
                 if session_id:
                     self.metrics_collector.record_request(
-                        session_id, "search_music", duration, False, str(type(e).__name__)
+                        session_id,
+                        "search_music",
+                        duration,
+                        False,
+                        str(type(e).__name__),
                     )
 
                 self.logger.error("Music search failed", query=query, error=str(e))
@@ -230,7 +245,7 @@ class YouTubeMusicMCPServer:
             name: str,
             session_id: Optional[str] = None,
             description: Optional[str] = None,
-            privacy_status: str = "PRIVATE"
+            privacy_status: str = "PRIVATE",
         ) -> Dict[str, Any]:
             """
             Create a new playlist on YouTube Music.
@@ -248,7 +263,9 @@ class YouTubeMusicMCPServer:
 
             try:
                 # Validate session and get OAuth token
-                session, oauth_token = await self._validate_session_and_token(session_id)
+                session, oauth_token = await self._validate_session_and_token(
+                    session_id
+                )
 
                 # Create playlist
                 playlist_id = await self.ytmusic_client.create_playlist(
@@ -272,14 +289,20 @@ class YouTubeMusicMCPServer:
                 duration = asyncio.get_event_loop().time() - start_time
                 if session_id:
                     self.metrics_collector.record_request(
-                        session_id, "create_playlist", duration, False, str(type(e).__name__)
+                        session_id,
+                        "create_playlist",
+                        duration,
+                        False,
+                        str(type(e).__name__),
                     )
 
                 self.logger.error("Playlist creation failed", name=name, error=str(e))
                 return {"success": False, "error": str(e)}
 
         @self.mcp.tool()
-        async def get_playlists(session_id: Optional[str] = None, limit: int = 25) -> Dict[str, Any]:
+        async def get_playlists(
+            session_id: Optional[str] = None, limit: int = 25
+        ) -> Dict[str, Any]:
             """
             Get user's playlists from YouTube Music.
 
@@ -294,7 +317,9 @@ class YouTubeMusicMCPServer:
 
             try:
                 # Validate session and get OAuth token
-                session, oauth_token = await self._validate_session_and_token(session_id)
+                session, oauth_token = await self._validate_session_and_token(
+                    session_id
+                )
 
                 # Get playlists
                 playlists = await self.ytmusic_client.get_user_playlists(
@@ -317,7 +342,11 @@ class YouTubeMusicMCPServer:
                 duration = asyncio.get_event_loop().time() - start_time
                 if session_id:
                     self.metrics_collector.record_request(
-                        session_id, "get_playlists", duration, False, str(type(e).__name__)
+                        session_id,
+                        "get_playlists",
+                        duration,
+                        False,
+                        str(type(e).__name__),
                     )
 
                 self.logger.error("Get playlists failed", error=str(e))
@@ -325,9 +354,7 @@ class YouTubeMusicMCPServer:
 
         @self.mcp.tool()
         async def add_songs_to_playlist(
-            playlist_id: str,
-            video_ids: List[str],
-            session_id: Optional[str] = None
+            playlist_id: str, video_ids: List[str], session_id: Optional[str] = None
         ) -> Dict[str, Any]:
             """
             Add songs to an existing playlist.
@@ -344,7 +371,9 @@ class YouTubeMusicMCPServer:
 
             try:
                 # Validate session and get OAuth token
-                session, oauth_token = await self._validate_session_and_token(session_id)
+                session, oauth_token = await self._validate_session_and_token(
+                    session_id
+                )
 
                 # Add songs to playlist
                 success = await self.ytmusic_client.add_songs_to_playlist(
@@ -367,17 +396,25 @@ class YouTubeMusicMCPServer:
                 duration = asyncio.get_event_loop().time() - start_time
                 if session_id:
                     self.metrics_collector.record_request(
-                        session_id, "add_songs_to_playlist", duration, False, str(type(e).__name__)
+                        session_id,
+                        "add_songs_to_playlist",
+                        duration,
+                        False,
+                        str(type(e).__name__),
                     )
 
-                self.logger.error("Add songs to playlist failed", playlist_id=playlist_id, error=str(e))
+                self.logger.error(
+                    "Add songs to playlist failed",
+                    playlist_id=playlist_id,
+                    error=str(e),
+                )
                 return {"success": False, "error": str(e)}
 
         @self.mcp.tool()
         async def get_playlist_details(
             playlist_id: str,
             session_id: Optional[str] = None,
-            limit: Optional[int] = None
+            limit: Optional[int] = None,
         ) -> Dict[str, Any]:
             """
             Get detailed information about a playlist.
@@ -394,7 +431,9 @@ class YouTubeMusicMCPServer:
 
             try:
                 # Validate session and get OAuth token
-                session, oauth_token = await self._validate_session_and_token(session_id)
+                session, oauth_token = await self._validate_session_and_token(
+                    session_id
+                )
 
                 # Get playlist details
                 playlist = await self.ytmusic_client.get_playlist_details(
@@ -416,10 +455,16 @@ class YouTubeMusicMCPServer:
                 duration = asyncio.get_event_loop().time() - start_time
                 if session_id:
                     self.metrics_collector.record_request(
-                        session_id, "get_playlist_details", duration, False, str(type(e).__name__)
+                        session_id,
+                        "get_playlist_details",
+                        duration,
+                        False,
+                        str(type(e).__name__),
                     )
 
-                self.logger.error("Get playlist details failed", playlist_id=playlist_id, error=str(e))
+                self.logger.error(
+                    "Get playlist details failed", playlist_id=playlist_id, error=str(e)
+                )
                 return {"success": False, "error": str(e)}
 
         # Health check endpoint (for Docker/Smithery)
@@ -473,7 +518,9 @@ class YouTubeMusicMCPServer:
                 self.logger.error("Get server status failed", error=str(e))
                 return {"error": str(e)}
 
-    async def _validate_session_and_token(self, session_id: Optional[str]) -> tuple[UserSession, OAuthToken]:
+    async def _validate_session_and_token(
+        self, session_id: Optional[str]
+    ) -> tuple[UserSession, OAuthToken]:
         """
         Validate session and get OAuth token.
 
@@ -503,11 +550,17 @@ class YouTubeMusicMCPServer:
         if session.oauth_token.is_expired:
             if session.oauth_token.refresh_token:
                 try:
-                    new_token = await self.oauth_manager.refresh_token(session.oauth_token)
+                    new_token = await self.oauth_manager.refresh_token(
+                        session.oauth_token
+                    )
                     session.oauth_token = new_token
                     await self.session_manager.update_session(session)
                 except Exception as e:
-                    self.logger.error("Token refresh failed", session_id=session_id[:8] + "...", error=str(e))
+                    self.logger.error(
+                        "Token refresh failed",
+                        session_id=session_id[:8] + "...",
+                        error=str(e),
+                    )
                     raise Exception("Token refresh failed, re-authentication required")
             else:
                 raise Exception("Token expired and no refresh token available")
@@ -537,7 +590,7 @@ class YouTubeMusicMCPServer:
             await self.health_checker.stop()
 
             # Close token storage if needed
-            if hasattr(self.token_storage, 'close'):
+            if hasattr(self.token_storage, "close"):
                 await self.token_storage.close()
 
             self.logger.info("YouTube Music MCP Server stopped")
@@ -559,6 +612,7 @@ def create_server() -> YouTubeMusicMCPServer:
         try:
             # Test if the provided key is valid
             import base64
+
             key_bytes = base64.b64decode(encryption_key)
             if len(key_bytes) != 32:
                 logger.warning("Invalid encryption key provided, generating new one")
@@ -591,7 +645,7 @@ if __name__ == "__main__":
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -625,13 +679,18 @@ if __name__ == "__main__":
         }
         oauth_endpoints = OAuthEndpoints(youtube_oauth_config)
 
-        # Create main application with OAuth routes
-        app = Starlette(routes=oauth_endpoints.get_routes() + [
-            Mount("/mcp", mcp_app),
-        ])
+        # Add OAuth middleware only to MCP app, not to OAuth discovery endpoints
+        mcp_app_with_auth = Starlette()
+        mcp_app_with_auth.add_middleware(OAuthMiddleware)
+        mcp_app_with_auth.mount("/", mcp_app)
 
-        # Add OAuth middleware (only for /mcp routes)
-        app.add_middleware(OAuthMiddleware)
+        # Create main application with OAuth routes (no auth required for discovery)
+        app = Starlette(
+            routes=oauth_endpoints.get_routes()
+            + [
+                Mount("/mcp", mcp_app_with_auth),
+            ]
+        )
 
         # Add CORS middleware for browser based clients
         app.add_middleware(
