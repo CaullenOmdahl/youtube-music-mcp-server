@@ -7,8 +7,17 @@ from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, timedelta
 import structlog
 from ytmusicapi import YTMusic
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+
+# Optional Google Auth imports - graceful fallback if not available
+try:
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
+    GOOGLE_AUTH_AVAILABLE = True
+except ImportError:
+    GOOGLE_AUTH_AVAILABLE = False
+    Request = None
+    Credentials = None
 
 from ..models.config import ServerConfig
 from .rate_limiter import RateLimiter
@@ -44,7 +53,39 @@ class YTMusicClient:
         self._ytmusic_client: Optional[YTMusic] = None
         self._credentials: Optional[Credentials] = None
 
+        # Validate configuration early to catch issues during initialization
+        self._validate_config()
+
         self.logger.info("YouTube Music client initialized")
+
+    def _validate_config(self) -> None:
+        """Validate that required configuration is present."""
+        # Check if Google Auth libraries are available
+        if not GOOGLE_AUTH_AVAILABLE:
+            raise YTMusicError(
+                "Google Auth libraries not available. Please install: pip install google-auth google-auth-oauthlib"
+            )
+
+        # Check if credentials are configured
+        if not all(
+            [
+                self.config.client_id,
+                self.config.client_secret,
+                self.config.refresh_token,
+            ]
+        ):
+            missing = []
+            if not self.config.client_id:
+                missing.append("CLIENT_ID")
+            if not self.config.client_secret:
+                missing.append("CLIENT_SECRET")
+            if not self.config.refresh_token:
+                missing.append("REFRESH_TOKEN")
+
+            raise YTMusicError(
+                f"Missing OAuth credentials: {', '.join(missing)}. "
+                "Please configure these in your Smithery settings."
+            )
 
     async def get_authenticated_client(self) -> YTMusic:
         """
@@ -56,6 +97,33 @@ class YTMusicClient:
         Raises:
             YTMusicError: If authentication fails
         """
+        # Check if Google Auth libraries are available
+        if not GOOGLE_AUTH_AVAILABLE:
+            raise YTMusicError(
+                "Google Auth libraries not available. Please install: pip install google-auth google-auth-oauthlib"
+            )
+
+        # Check if credentials are configured
+        if not all(
+            [
+                self.config.client_id,
+                self.config.client_secret,
+                self.config.refresh_token,
+            ]
+        ):
+            missing = []
+            if not self.config.client_id:
+                missing.append("CLIENT_ID")
+            if not self.config.client_secret:
+                missing.append("CLIENT_SECRET")
+            if not self.config.refresh_token:
+                missing.append("REFRESH_TOKEN")
+
+            raise YTMusicError(
+                f"Missing OAuth credentials: {', '.join(missing)}. "
+                "Please configure these in your Smithery settings."
+            )
+
         try:
             if self._ytmusic_client is None:
                 # Create credentials from user-provided OAuth data

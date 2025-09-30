@@ -36,11 +36,19 @@ class YouTubeMusicMCPServer:
         self.logger = logger.bind(component="ytmusic_mcp_server")
 
         # Initialize YouTube Music components with direct OAuth credentials
-        self.rate_limiter = RateLimiter(
-            requests_per_minute=config.api_config.rate_limit_per_minute,
-            requests_per_hour=config.api_config.rate_limit_per_hour,
-        )
-        self.ytmusic_client = YTMusicClient(config, self.rate_limiter)
+        try:
+            self.rate_limiter = RateLimiter(
+                requests_per_minute=config.api_config.rate_limit_per_minute,
+                requests_per_hour=config.api_config.rate_limit_per_hour,
+            )
+            self.ytmusic_client = YTMusicClient(config, self.rate_limiter)
+            self.logger.info("YouTube Music client initialized successfully")
+        except Exception as e:
+            self.logger.error("Failed to initialize YouTube Music client", error=str(e))
+            # Continue initialization even if YTMusic client fails
+            # This allows the server to start and provide helpful error messages
+            self.rate_limiter = None
+            self.ytmusic_client = None
 
         # Initialize monitoring
         self.metrics_collector = MetricsCollector()
@@ -117,6 +125,13 @@ class YouTubeMusicMCPServer:
             Returns:
                 Search results from YouTube Music
             """
+            # Check if client is available
+            if self.ytmusic_client is None:
+                return {
+                    "success": False,
+                    "error": "YouTube Music client not initialized. Please check your OAuth credentials (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) in Smithery settings.",
+                }
+
             try:
                 # Perform search using direct authentication
                 results = await self.ytmusic_client.search_music(
@@ -152,6 +167,13 @@ class YouTubeMusicMCPServer:
             Returns:
                 Created playlist information
             """
+            # Check if client is available
+            if self.ytmusic_client is None:
+                return {
+                    "success": False,
+                    "error": "YouTube Music client not initialized. Please check your OAuth credentials (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) in Smithery settings.",
+                }
+
             try:
                 # Create playlist using direct authentication
                 result = await self.ytmusic_client.create_playlist(
@@ -178,6 +200,13 @@ class YouTubeMusicMCPServer:
             Returns:
                 User's playlists
             """
+            # Check if client is available
+            if self.ytmusic_client is None:
+                return {
+                    "success": False,
+                    "error": "YouTube Music client not initialized. Please check your OAuth credentials (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) in Smithery settings.",
+                }
+
             try:
                 # Get playlists using direct authentication
                 playlists = await self.ytmusic_client.get_user_playlists(limit)
@@ -206,6 +235,13 @@ class YouTubeMusicMCPServer:
             Returns:
                 Operation result
             """
+            # Check if client is available
+            if self.ytmusic_client is None:
+                return {
+                    "success": False,
+                    "error": "YouTube Music client not initialized. Please check your OAuth credentials (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) in Smithery settings.",
+                }
+
             try:
                 # Add songs to playlist using direct authentication
                 result = await self.ytmusic_client.add_songs_to_playlist(
@@ -240,6 +276,13 @@ class YouTubeMusicMCPServer:
             Returns:
                 Playlist details including tracks
             """
+            # Check if client is available
+            if self.ytmusic_client is None:
+                return {
+                    "success": False,
+                    "error": "YouTube Music client not initialized. Please check your OAuth credentials (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) in Smithery settings.",
+                }
+
             try:
                 # Get playlist details using direct authentication
                 playlist = await self.ytmusic_client.get_playlist_details(
