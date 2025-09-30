@@ -1,5 +1,5 @@
 """
-YouTube Music API client with OAuth integration and rate limiting.
+YouTube Music API client with direct OAuth credentials.
 """
 
 import asyncio
@@ -7,9 +7,10 @@ from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, timedelta
 import structlog
 from ytmusicapi import YTMusic
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
-from ..models.auth import OAuthToken, UserSession
-from ..models.config import APIConfig
+from ..models.config import ServerConfig
 from .rate_limiter import RateLimiter
 
 logger = structlog.get_logger(__name__)
@@ -17,44 +18,37 @@ logger = structlog.get_logger(__name__)
 
 class YTMusicError(Exception):
     """YouTube Music API error."""
+
     pass
 
 
 class YTMusicClient:
     """
-    YouTube Music API client with OAuth integration and comprehensive error handling.
+    YouTube Music API client with direct OAuth credentials.
 
     Features:
-    - OAuth 2.1 token-based authentication
-    - Rate limiting per session
-    - Automatic retry with exponential backoff
+    - Direct OAuth 2.0 credentials (client_id, client_secret, refresh_token)
+    - Automatic token refresh
+    - Rate limiting
     - Comprehensive error handling
-    - Request logging and monitoring
     """
 
     def __init__(
         self,
-        api_config: APIConfig,
+        config: ServerConfig,
         rate_limiter: Optional[RateLimiter] = None,
     ):
-        self.config = api_config
+        self.config = config
         self.rate_limiter = rate_limiter or RateLimiter()
         self.logger = logger.bind(component="ytmusic_client")
-        self._clients: Dict[str, YTMusic] = {}
+        self._ytmusic_client: Optional[YTMusic] = None
+        self._credentials: Optional[Credentials] = None
 
         self.logger.info("YouTube Music client initialized")
 
-    async def get_authenticated_client(
-        self,
-        session: UserSession,
-        oauth_token: OAuthToken,
-    ) -> YTMusic:
+    async def get_authenticated_client(self) -> YTMusic:
         """
-        Get authenticated YouTube Music client for session.
-
-        Args:
-            session: User session
-            oauth_token: OAuth token for authentication
+        Get authenticated YouTube Music client using configured credentials.
 
         Returns:
             Authenticated YTMusic client
@@ -63,51 +57,47 @@ class YTMusicClient:
             YTMusicError: If authentication fails
         """
         try:
-            # Check if we have a cached client
-            client_key = f"{session.session_id}_{oauth_token.access_token[:8]}"
-            if client_key in self._clients:
-                self.logger.debug(
-                    "Using cached YTMusic client",
-                    session_id=session.session_id[:8] + "...",
+            if self._ytmusic_client is None:
+                # Create credentials from user-provided OAuth data
+                credentials = Credentials(
+                    token=None,  # Will be refreshed
+                    refresh_token=self.config.refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=self.config.client_id,
+                    client_secret=self.config.client_secret,
+                    scopes=[
+                        "https://www.googleapis.com/auth/youtube.readonly",
+                        "https://www.googleapis.com/auth/youtubepartner",
+                    ],
                 )
-                return self._clients[client_key]
 
-            # Check rate limits
-            if not await self.rate_limiter.check_rate_limit(session.session_id):
-                raise YTMusicError("Rate limit exceeded for session")
+                # Refresh the token to get a valid access token
+                credentials.refresh(Request())
+                self._credentials = credentials
 
-            # Create authenticated client
-            auth_headers = {
-                "Authorization": f"Bearer {oauth_token.access_token}",
-                "X-Origin": "https://music.youtube.com",
-            }
+                # Create YTMusic client with the access token
+                self._ytmusic_client = YTMusic(auth=credentials.token)
 
-            # Initialize YTMusic with OAuth headers
-            ytmusic = YTMusic(auth=auth_headers, language="en")
+                self.logger.info("YouTube Music client authenticated successfully")
 
-            # Cache the client
-            self._clients[client_key] = ytmusic
+            # Check if token needs refresh
+            elif self._credentials and self._credentials.expired:
+                self.logger.info("Access token expired, refreshing...")
+                self._credentials.refresh(Request())
+                # Create new client with refreshed token
+                self._ytmusic_client = YTMusic(auth=self._credentials.token)
+                self.logger.info("YouTube Music client token refreshed")
 
-            self.logger.info(
-                "Created authenticated YTMusic client",
-                session_id=session.session_id[:8] + "...",
-                token_expires_in=oauth_token.expires_in,
-            )
-
-            return ytmusic
+            return self._ytmusic_client
 
         except Exception as e:
             self.logger.error(
-                "Failed to create authenticated YTMusic client",
-                session_id=session.session_id[:8] + "...",
-                error=str(e),
+                "Failed to create authenticated YTMusic client", error=str(e)
             )
             raise YTMusicError(f"Authentication failed: {e}")
 
     async def search_music(
         self,
-        session: UserSession,
-        oauth_token: OAuthToken,
         query: str,
         filter_type: Optional[str] = None,
         limit: int = 20,
@@ -116,8 +106,6 @@ class YTMusicClient:
         Search for music on YouTube Music.
 
         Args:
-            session: User session
-            oauth_token: OAuth token
             query: Search query
             filter_type: Optional filter (songs, videos, albums, artists, playlists)
             limit: Maximum results to return
@@ -129,25 +117,20 @@ class YTMusicClient:
             YTMusicError: If search fails
         """
         try:
-            client = await self.get_authenticated_client(session, oauth_token)
-
-            # Apply rate limiting
-            await self.rate_limiter.wait_if_needed(session.session_id)
+            client = await self.get_authenticated_client()
+            await self.rate_limiter.wait_if_needed("globalglobal")
 
             self.logger.debug(
                 "Searching YouTube Music",
-                session_id=session.session_id[:8] + "...",
                 query=query[:50] + "..." if len(query) > 50 else query,
                 filter_type=filter_type,
                 limit=limit,
             )
 
-            # Perform search
             results = client.search(query, filter=filter_type, limit=limit)
 
             self.logger.info(
                 "YouTube Music search completed",
-                session_id=session.session_id[:8] + "...",
                 query=query[:50] + "..." if len(query) > 50 else query,
                 result_count=len(results),
             )
@@ -155,229 +138,167 @@ class YTMusicClient:
             return results
 
         except Exception as e:
-            self.logger.error(
-                "YouTube Music search failed",
-                session_id=session.session_id[:8] + "...",
-                query=query[:50] + "..." if len(query) > 50 else query,
-                error=str(e),
-            )
+            self.logger.error("Search failed", query=query, error=str(e))
             raise YTMusicError(f"Search failed: {e}")
 
-    async def get_user_playlists(
-        self,
-        session: UserSession,
-        oauth_token: OAuthToken,
-        limit: int = 25,
-    ) -> List[Dict[str, Any]]:
+    async def get_user_playlists(self, limit: int = 25) -> List[Dict[str, Any]]:
         """
-        Get user's playlists from YouTube Music.
+        Get user's playlists.
 
         Args:
-            session: User session
-            oauth_token: OAuth token
             limit: Maximum playlists to return
 
         Returns:
-            List of user playlists
+            List of playlists
 
         Raises:
-            YTMusicError: If operation fails
+            YTMusicError: If request fails
         """
         try:
-            client = await self.get_authenticated_client(session, oauth_token)
+            client = await self.get_authenticated_client()
+            await self.rate_limiter.wait_if_needed("global")
 
-            # Apply rate limiting
-            await self.rate_limiter.wait_if_needed(session.session_id)
+            self.logger.debug("Getting user playlists", limit=limit)
 
-            self.logger.debug(
-                "Getting user playlists",
-                session_id=session.session_id[:8] + "...",
-                limit=limit,
-            )
+            playlists = client.get_library_playlists(limit)
 
-            # Get playlists
-            playlists = client.get_library_playlists(limit=limit)
-
-            self.logger.info(
-                "Retrieved user playlists",
-                session_id=session.session_id[:8] + "...",
-                playlist_count=len(playlists),
-            )
+            self.logger.info("Retrieved user playlists", playlist_count=len(playlists))
 
             return playlists
 
         except Exception as e:
-            self.logger.error(
-                "Failed to get user playlists",
-                session_id=session.session_id[:8] + "...",
-                error=str(e),
-            )
-            raise YTMusicError(f"Failed to get playlists: {e}")
+            self.logger.error("Get playlists failed", error=str(e))
+            raise YTMusicError(f"Get playlists failed: {e}")
 
     async def create_playlist(
         self,
-        session: UserSession,
-        oauth_token: OAuthToken,
-        title: str,
-        description: Optional[str] = None,
+        name: str,
+        description: str = "",
         privacy_status: str = "PRIVATE",
-        video_ids: Optional[List[str]] = None,
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
-        Create a new playlist on YouTube Music.
+        Create a new playlist.
 
         Args:
-            session: User session
-            oauth_token: OAuth token
-            title: Playlist title
-            description: Optional playlist description
-            privacy_status: Playlist privacy (PRIVATE, PUBLIC, UNLISTED)
-            video_ids: Optional list of video IDs to add
+            name: Playlist name
+            description: Playlist description
+            privacy_status: PRIVATE, PUBLIC, or UNLISTED
 
         Returns:
-            Created playlist ID
+            Created playlist information
 
         Raises:
             YTMusicError: If creation fails
         """
         try:
-            client = await self.get_authenticated_client(session, oauth_token)
-
-            # Apply rate limiting
-            await self.rate_limiter.wait_if_needed(session.session_id)
+            client = await self.get_authenticated_client()
+            await self.rate_limiter.wait_if_needed("global")
 
             self.logger.debug(
-                "Creating playlist",
-                session_id=session.session_id[:8] + "...",
-                title=title,
-                privacy_status=privacy_status,
-                initial_videos=len(video_ids) if video_ids else 0,
+                "Creating playlist", name=name, privacy_status=privacy_status
             )
 
-            # Create playlist
             playlist_id = client.create_playlist(
-                title=title,
-                description=description,
-                privacy_status=privacy_status,
-                video_ids=video_ids,
+                title=name, description=description, privacy_status=privacy_status
             )
+
+            result = {
+                "playlist_id": playlist_id,
+                "name": name,
+                "description": description,
+                "privacy_status": privacy_status,
+                "created_at": datetime.utcnow().isoformat(),
+            }
 
             self.logger.info(
-                "Created playlist",
-                session_id=session.session_id[:8] + "...",
-                playlist_id=playlist_id,
-                title=title,
+                "Playlist created successfully", playlist_id=playlist_id, name=name
             )
 
-            return playlist_id
+            return result
 
         except Exception as e:
-            self.logger.error(
-                "Failed to create playlist",
-                session_id=session.session_id[:8] + "...",
-                title=title,
-                error=str(e),
-            )
-            raise YTMusicError(f"Failed to create playlist: {e}")
+            self.logger.error("Create playlist failed", name=name, error=str(e))
+            raise YTMusicError(f"Create playlist failed: {e}")
 
     async def add_songs_to_playlist(
         self,
-        session: UserSession,
-        oauth_token: OAuthToken,
         playlist_id: str,
         video_ids: List[str],
-    ) -> bool:
+    ) -> Dict[str, Any]:
         """
         Add songs to an existing playlist.
 
         Args:
-            session: User session
-            oauth_token: OAuth token
             playlist_id: Target playlist ID
             video_ids: List of video IDs to add
 
         Returns:
-            True if successful
+            Addition result information
 
         Raises:
-            YTMusicError: If operation fails
+            YTMusicError: If addition fails
         """
         try:
-            client = await self.get_authenticated_client(session, oauth_token)
-
-            # Apply rate limiting
-            await self.rate_limiter.wait_if_needed(session.session_id)
+            client = await self.get_authenticated_client()
+            await self.rate_limiter.wait_if_needed("global")
 
             self.logger.debug(
                 "Adding songs to playlist",
-                session_id=session.session_id[:8] + "...",
                 playlist_id=playlist_id,
-                video_count=len(video_ids),
+                song_count=len(video_ids),
             )
 
             # Add songs to playlist
-            status = client.add_playlist_items(playlist_id, video_ids)
+            result = client.add_playlist_items(playlist_id, video_ids)
 
             self.logger.info(
-                "Added songs to playlist",
-                session_id=session.session_id[:8] + "...",
+                "Songs added to playlist successfully",
                 playlist_id=playlist_id,
-                added_count=len(video_ids),
-                status=status,
+                song_count=len(video_ids),
             )
 
-            return True
+            return {
+                "playlist_id": playlist_id,
+                "added_count": len(video_ids),
+                "video_ids": video_ids,
+                "result": result,
+                "added_at": datetime.utcnow().isoformat(),
+            }
 
         except Exception as e:
             self.logger.error(
-                "Failed to add songs to playlist",
-                session_id=session.session_id[:8] + "...",
-                playlist_id=playlist_id,
-                error=str(e),
+                "Add songs to playlist failed", playlist_id=playlist_id, error=str(e)
             )
-            raise YTMusicError(f"Failed to add songs to playlist: {e}")
+            raise YTMusicError(f"Add songs to playlist failed: {e}")
 
     async def get_playlist_details(
         self,
-        session: UserSession,
-        oauth_token: OAuthToken,
         playlist_id: str,
         limit: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Get detailed information about a playlist.
+        Get detailed playlist information including tracks.
 
         Args:
-            session: User session
-            oauth_token: OAuth token
             playlist_id: Playlist ID
-            limit: Optional limit for tracks
+            limit: Limit for tracks
 
         Returns:
-            Playlist details including tracks
+            Detailed playlist information
 
         Raises:
-            YTMusicError: If operation fails
+            YTMusicError: If request fails
         """
         try:
-            client = await self.get_authenticated_client(session, oauth_token)
+            client = await self.get_authenticated_client()
+            await self.rate_limiter.wait_if_needed("global")
 
-            # Apply rate limiting
-            await self.rate_limiter.wait_if_needed(session.session_id)
+            self.logger.debug("Getting playlist details", playlist_id=playlist_id)
 
-            self.logger.debug(
-                "Getting playlist details",
-                session_id=session.session_id[:8] + "...",
-                playlist_id=playlist_id,
-                limit=limit,
-            )
-
-            # Get playlist details
-            playlist = client.get_playlist(playlist_id, limit=limit)
+            playlist = client.get_playlist(playlist_id, limit)
 
             self.logger.info(
                 "Retrieved playlist details",
-                session_id=session.session_id[:8] + "...",
                 playlist_id=playlist_id,
                 track_count=len(playlist.get("tracks", [])),
             )
@@ -386,49 +307,25 @@ class YTMusicClient:
 
         except Exception as e:
             self.logger.error(
-                "Failed to get playlist details",
-                session_id=session.session_id[:8] + "...",
-                playlist_id=playlist_id,
-                error=str(e),
+                "Get playlist details failed", playlist_id=playlist_id, error=str(e)
             )
-            raise YTMusicError(f"Failed to get playlist details: {e}")
-
-    def clear_client_cache(self, session_id: Optional[str] = None) -> None:
-        """
-        Clear cached clients for memory management.
-
-        Args:
-            session_id: Optional specific session to clear (clears all if None)
-        """
-        if session_id:
-            # Clear specific session clients
-            keys_to_remove = [key for key in self._clients.keys() if key.startswith(session_id)]
-            for key in keys_to_remove:
-                del self._clients[key]
-
-            self.logger.debug(
-                "Cleared cached clients for session",
-                session_id=session_id[:8] + "...",
-                cleared_count=len(keys_to_remove),
-            )
-        else:
-            # Clear all cached clients
-            cleared_count = len(self._clients)
-            self._clients.clear()
-
-            self.logger.debug(
-                "Cleared all cached clients",
-                cleared_count=cleared_count,
-            )
+            raise YTMusicError(f"Get playlist details failed: {e}")
 
     async def get_client_stats(self) -> Dict[str, Any]:
         """
-        Get client statistics.
+        Get client statistics and health information.
 
         Returns:
-            Dictionary with client statistics
+            Client statistics
         """
         return {
-            "cached_clients": len(self._clients),
+            "authenticated": self._ytmusic_client is not None,
+            "credentials_valid": self._credentials is not None
+            and not self._credentials.expired
+            if self._credentials
+            else False,
+            "client_id": self.config.client_id[:10] + "..."
+            if self.config.client_id
+            else None,
             "rate_limiter_stats": await self.rate_limiter.get_stats(),
         }

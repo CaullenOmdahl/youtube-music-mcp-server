@@ -83,3 +83,4 @@ htmlcov/
 *.temp
 .tmp/
 .temp/
+*.log

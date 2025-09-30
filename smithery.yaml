@@ -4,50 +4,28 @@ build:
   dockerBuildPath: "."
 startCommand:
   type: "http"
-  oauth:
-    enabled: true
-    metadata:
-      resource_metadata: "/.well-known/oauth-protected-resource"
-      authorization_server: "/.well-known/oauth-authorization-server"
-    endpoints:
-      authorize: "/oauth/authorize"
-      token: "/oauth/token"
-      register: "/oauth/register"
-    scopes:
-      - "mcp:tools"
-      - "youtube:readonly"
-      - "youtube:manage_playlists"
-    features:
-      - "dynamic_client_registration"
-      - "pkce_required"
-      - "refresh_tokens"
   configSchema:
     type: "object"
     properties:
-      oauth_client_id:
+      CLIENT_ID:
         type: "string"
         title: "Google OAuth Client ID"
-        description: "OAuth 2.1 client ID from Google Cloud Console with YouTube Data API v3 enabled"
-      oauth_client_secret:
+        description: "OAuth2 client ID from Google Cloud Console with YouTube Data API v3 enabled. Get this from https://console.cloud.google.com/apis/credentials"
+      CLIENT_SECRET:
         type: "string"
         title: "Google OAuth Client Secret"
-        description: "OAuth 2.1 client secret from Google Cloud Console"
+        description: "OAuth2 client secret from Google Cloud Console"
         format: "password"
-      server_url:
+      REFRESH_TOKEN:
         type: "string"
-        title: "Server URL"
-        description: "Public URL of the MCP server (auto-detected if not provided)"
-        default: ""
+        title: "Google OAuth Refresh Token"
+        description: "OAuth2 refresh token for YouTube Data API access. Generate using the OAuth playground or your own application"
+        format: "password"
       redis_url:
         type: "string"
         title: "Redis Connection URL"
         description: "Redis URL for session and token storage (optional, defaults to in-memory)"
         default: ""
-      encryption_key:
-        type: "string"
-        title: "Encryption Key"
-        description: "32-byte base64 encryption key for token storage"
-        format: "password"
       rate_limit_per_minute:
         type: "integer"
         title: "Rate Limit Per Minute"
@@ -55,11 +33,97 @@ startCommand:
         default: 60
         minimum: 1
         maximum: 300
-    required: ["oauth_client_id", "oauth_client_secret", "encryption_key"]
+    required: ["CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN"]
   exampleConfig:
-    oauth_client_id: "your-client-id.googleusercontent.com"
-    oauth_client_secret: "GOCSPX-your-client-secret"
-    server_url: "https://your-server.smithery.ai"
-    encryption_key: "base64-encoded-32-byte-key"
-    redis_url: "redis://localhost:6379"
+    CLIENT_ID: "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com"
+    CLIENT_SECRET: "GOCSPX-your-client-secret-here"
+    REFRESH_TOKEN: "1//04abcdefghijklmnopqrstuvwxyz-refresh-token-here"
+    redis_url: ""
     rate_limit_per_minute: 60
+  about: |
+    # YouTube Music MCP Server
+
+    This server provides Model Context Protocol (MCP) access to YouTube Music functionality including searching, playlist management, and music discovery.
+
+    ## 🚀 Quick Setup
+
+    ### 1. Create Google Cloud Project
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new project or select existing one
+    3. Enable the **YouTube Data API v3**:
+       - Go to APIs & Services → Library
+       - Search for "YouTube Data API v3"
+       - Click "Enable"
+
+    ### 2. Create OAuth Credentials
+    1. Go to APIs & Services → Credentials
+    2. Click "Create Credentials" → "OAuth 2.0 Client IDs"
+    3. Choose "Desktop application" as application type
+    4. Name it "YouTube Music MCP Server"
+    5. Copy the **Client ID** and **Client Secret**
+
+    ### 3. Generate Refresh Token
+
+    **Option A: Using Google OAuth Playground**
+    1. Go to [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)
+    2. Click settings gear → Check "Use your own OAuth credentials"
+    3. Enter your Client ID and Client Secret
+    4. In Step 1, add these scopes:
+       - `https://www.googleapis.com/auth/youtube.readonly`
+       - `https://www.googleapis.com/auth/youtubepartner`
+    5. Click "Authorize APIs" and sign in with your Google account
+    6. In Step 2, click "Exchange authorization code for tokens"
+    7. Copy the **Refresh Token**
+
+    **Option B: Using Python Script**
+    ```python
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    CLIENT_ID = "your-client-id"
+    CLIENT_SECRET = "your-client-secret"
+    SCOPES = [
+        'https://www.googleapis.com/auth/youtube.readonly',
+        'https://www.googleapis.com/auth/youtubepartner'
+    ]
+
+    flow = InstalledAppFlow.from_client_config({
+        "installed": {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+        }
+    }, SCOPES)
+
+    creds = flow.run_local_server(port=0)
+    print(f"Refresh Token: {creds.refresh_token}")
+    ```
+
+    ### 4. Configure Server
+    Enter your credentials in the Smithery configuration:
+    - **CLIENT_ID**: Your OAuth 2.0 Client ID
+    - **CLIENT_SECRET**: Your OAuth 2.0 Client Secret
+    - **REFRESH_TOKEN**: Your OAuth 2.0 Refresh Token
+
+    ## 🔧 Available Tools
+
+    - **search_music**: Search for songs, albums, artists, or playlists
+    - **create_playlist**: Create new playlists
+    - **get_playlists**: List user's playlists
+    - **add_songs_to_playlist**: Add songs to existing playlists
+    - **get_playlist_details**: Get detailed playlist information
+    - **health_check**: Server health monitoring
+
+    ## 🔐 Security Notes
+
+    - Your credentials are encrypted and stored securely
+    - Refresh tokens are used to maintain access without re-authentication
+    - Rate limiting prevents API quota exhaustion
+    - No data is logged or shared externally
+
+    ## 📚 Useful Links
+
+    - [YouTube Data API Documentation](https://developers.google.com/youtube/v3)
+    - [Google Cloud Console](https://console.cloud.google.com/)
+    - [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)
+    - [MCP Specification](https://modelcontextprotocol.io/)
