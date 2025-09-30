@@ -74,16 +74,7 @@ class ServerConfig:
         ):
             return self._cached_url
 
-        # 2. Request context detection (new approach)
-        request_url = self._detect_from_request_context()
-        if request_url:
-            if self._cached_url != request_url:
-                self.logger.info("Detected URL from request context", url=request_url)
-            self._cached_url = request_url
-            self._last_request_headers_hash = current_headers_hash
-            return request_url
-
-        # 3. Smithery platform detection
+        # 2. Smithery platform detection (high priority for Smithery environments)
         smithery_url = self._detect_smithery_url()
         if smithery_url:
             if self._cached_url != smithery_url:
@@ -91,6 +82,15 @@ class ServerConfig:
             self._cached_url = smithery_url
             self._last_request_headers_hash = current_headers_hash
             return smithery_url
+
+        # 3. Request context detection (fallback for other proxies)
+        request_url = self._detect_from_request_context()
+        if request_url:
+            if self._cached_url != request_url:
+                self.logger.info("Detected URL from request context", url=request_url)
+            self._cached_url = request_url
+            self._last_request_headers_hash = current_headers_hash
+            return request_url
 
         # 4. Generic proxy detection
         proxy_url = self._detect_proxy_url()
@@ -117,11 +117,19 @@ class ServerConfig:
         Returns:
             Smithery public URL or empty string if not detected
         """
-        # Check for Smithery-specific environment variables
+        # 1. Check for explicit Smithery public URL (highest priority)
         if os.getenv("SMITHERY_PUBLIC_URL"):
             return os.getenv("SMITHERY_PUBLIC_URL")
 
-        # Construct from Smithery username and server name
+        # 2. Check if request headers contain Smithery public URL
+        if self._current_request:
+            smithery_url_header = self._current_request.headers.get(
+                "x-smithery-public-url"
+            )
+            if smithery_url_header:
+                return smithery_url_header
+
+        # 3. Construct from Smithery username and server name
         username = os.getenv("SMITHERY_USERNAME") or os.getenv("SMITHERY_USER")
         server_name = os.getenv("SMITHERY_SERVER_NAME") or os.getenv(
             "SMITHERY_SERVICE_NAME"
@@ -130,7 +138,19 @@ class ServerConfig:
         if username and server_name:
             return f"https://server.smithery.ai/@{username}/{server_name}"
 
-        # Check for Smithery domain in forwarded headers
+        # 4. Check if current host looks like Smithery's internal URL and construct public URL
+        if self._current_request:
+            host = self._current_request.headers.get("host", "")
+            # If it's a Smithery internal URL (like smithery-xxx.fly.dev), construct the public URL
+            if "smithery" in host.lower() and "fly.dev" in host.lower():
+                # Try to extract info from environment or use defaults
+                username = os.getenv("SMITHERY_USERNAME", "CaullenOmdahl")
+                server_name = os.getenv(
+                    "SMITHERY_SERVER_NAME", "youtube-music-mcp-server"
+                )
+                return f"https://server.smithery.ai/@{username}/{server_name}"
+
+        # 5. Check for Smithery domain in forwarded headers
         forwarded_host = os.getenv("HTTP_X_FORWARDED_HOST") or os.getenv(
             "X_FORWARDED_HOST"
         )
