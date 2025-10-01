@@ -6,7 +6,6 @@ on Smithery or other proxy platforms.
 """
 
 import os
-from typing import Optional
 from urllib.parse import urljoin, urlparse
 import structlog
 
@@ -26,7 +25,7 @@ class ServerConfig:
         """Set current request for URL detection."""
         self._current_request = request
 
-    def _get_request_headers_hash(self) -> Optional[str]:
+    def _get_request_headers_hash(self) -> str | None:
         """Generate a hash of relevant request headers for caching."""
         if not self._current_request:
             return None

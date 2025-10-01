@@ -4,7 +4,7 @@ Encryption manager for secure token and data storage.
 
 import base64
 import json
-from typing import Any, Dict, Union
+from typing import Any
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -87,7 +87,7 @@ class EncryptionManager:
         key = kdf.derive(password.encode('utf-8'))
         return base64.b64encode(key).decode('utf-8')
 
-    def encrypt(self, data: Union[str, Dict[str, Any], Any]) -> str:
+    def encrypt(self, data: str | dict[str, Any, Any]) -> str:
         """
         Encrypt data and return base64-encoded result.
 
@@ -121,7 +121,7 @@ class EncryptionManager:
             self.logger.error("Encryption failed", error=str(e))
             raise EncryptionError(f"Encryption failed: {e}")
 
-    def decrypt(self, encrypted_data: str, return_json: bool = False) -> Union[str, Dict[str, Any]]:
+    def decrypt(self, encrypted_data: str, return_json: bool = False) -> str | dict[str, Any]:
         """
         Decrypt base64-encoded encrypted data.
 
@@ -163,7 +163,7 @@ class EncryptionManager:
             self.logger.error("Decryption failed", error=str(e))
             raise EncryptionError(f"Decryption failed: {e}")
 
-    def encrypt_token(self, token_data: Dict[str, Any]) -> str:
+    def encrypt_token(self, token_data: dict[str, Any]) -> str:
         """
         Encrypt OAuth token data for secure storage.
 
@@ -175,7 +175,7 @@ class EncryptionManager:
         """
         return self.encrypt(token_data)
 
-    def decrypt_token(self, encrypted_token: str) -> Dict[str, Any]:
+    def decrypt_token(self, encrypted_token: str) -> dict[str, Any]:
         """
         Decrypt OAuth token data from storage.
 

@@ -2,9 +2,8 @@
 YouTube Music API client with direct OAuth credentials.
 """
 
-import asyncio
-from typing import Optional, Dict, Any, List, Union
-from datetime import datetime, timedelta
+from typing import Any
+from datetime import datetime
 import structlog
 from ytmusicapi import YTMusic
 
@@ -45,13 +44,13 @@ class YTMusicClient:
     def __init__(
         self,
         config: ServerConfig,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
     ):
         self.config = config
         self.rate_limiter = rate_limiter or RateLimiter()
         self.logger = logger.bind(component="ytmusic_client")
-        self._ytmusic_client: Optional[YTMusic] = None
-        self._credentials: Optional[Credentials] = None
+        self._ytmusic_client: YTMusic | None = None
+        self._credentials: Credentials | None = None
 
         # Validate configuration early to catch issues during initialization
         self._validate_config()
@@ -167,9 +166,9 @@ class YTMusicClient:
     async def search_music(
         self,
         query: str,
-        filter_type: Optional[str] = None,
+        filter_type: str | None = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Search for music on YouTube Music.
 
@@ -209,7 +208,7 @@ class YTMusicClient:
             self.logger.error("Search failed", query=query, error=str(e))
             raise YTMusicError(f"Search failed: {e}")
 
-    async def get_user_playlists(self, limit: int = 25) -> List[Dict[str, Any]]:
+    async def get_user_playlists(self, limit: int = 25) -> list[dict[str, Any]]:
         """
         Get user's playlists.
 
@@ -243,7 +242,7 @@ class YTMusicClient:
         name: str,
         description: str = "",
         privacy_status: str = "PRIVATE",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a new playlist.
 
@@ -291,8 +290,8 @@ class YTMusicClient:
     async def add_songs_to_playlist(
         self,
         playlist_id: str,
-        video_ids: List[str],
-    ) -> Dict[str, Any]:
+        video_ids: list[str],
+    ) -> dict[str, Any]:
         """
         Add songs to an existing playlist.
 
@@ -342,8 +341,8 @@ class YTMusicClient:
     async def get_playlist_details(
         self,
         playlist_id: str,
-        limit: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        limit: int | None = None,
+    ) -> dict[str, Any]:
         """
         Get detailed playlist information including tracks.
 
@@ -379,7 +378,7 @@ class YTMusicClient:
             )
             raise YTMusicError(f"Get playlist details failed: {e}")
 
-    async def get_client_stats(self) -> Dict[str, Any]:
+    async def get_client_stats(self) -> dict[str, Any]:
         """
         Get client statistics and health information.
 

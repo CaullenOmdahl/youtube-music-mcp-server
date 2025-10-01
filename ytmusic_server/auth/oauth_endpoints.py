@@ -4,13 +4,10 @@ OAuth 2.0 endpoints for MCP server.
 Implements authorization server endpoints for RFC 6749 and RFC 9728 compliance.
 """
 
-import os
 import secrets
 import time
-from typing import Dict, Any, Optional
-from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, RedirectResponse, HTMLResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 import structlog
 
@@ -23,7 +20,7 @@ logger = structlog.get_logger(__name__)
 class OAuthEndpoints:
     """OAuth 2.0 authorization server endpoints."""
 
-    def __init__(self, youtube_oauth_config: Dict[str, str]):
+    def __init__(self, youtube_oauth_config: dict[str, str]):
         self.youtube_config = youtube_oauth_config
         self.metadata_handler = ResourceMetadataHandler(config.base_url, config.base_url)
         self.logger = logger.bind(component="oauth_endpoints")
@@ -188,8 +185,8 @@ class OAuthEndpoints:
             code = form.get("code")
             client_id = form.get("client_id")
             client_secret = form.get("client_secret")
-            redirect_uri = form.get("redirect_uri")
-            code_verifier = form.get("code_verifier")
+            form.get("redirect_uri")
+            form.get("code_verifier")
 
             # Validate client
             if not client_id or client_id not in self.clients:

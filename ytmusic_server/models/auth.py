@@ -3,7 +3,7 @@ Authentication models for OAuth 2.1 and session management.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any
 from pydantic import BaseModel, Field
 from enum import Enum
 import secrets
@@ -45,14 +45,14 @@ class OAuthToken(BaseModel):
     """OAuth 2.1 token with refresh capabilities."""
 
     access_token: str = Field(..., description="OAuth access token")
-    refresh_token: Optional[str] = Field(None, description="OAuth refresh token")
+    refresh_token: str | None = Field(None, description="OAuth refresh token")
     token_type: str = Field(default="Bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiry in seconds")
     scope: str = Field(..., description="Granted scopes")
 
     # Internal fields
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    refreshed_at: Optional[datetime] = Field(None, description="Last refresh time")
+    refreshed_at: datetime | None = Field(None, description="Last refresh time")
     refresh_count: int = Field(default=0, description="Number of refreshes")
 
     @property
@@ -71,7 +71,7 @@ class OAuthToken(BaseModel):
         """Check if token needs refresh."""
         return self.is_expired and self.refresh_token is not None
 
-    def refresh(self, new_token_data: Dict[str, Any]) -> "OAuthToken":
+    def refresh(self, new_token_data: dict[str, Any]) -> "OAuthToken":
         """Create new token from refresh response."""
         return OAuthToken(
             access_token=new_token_data["access_token"],
@@ -89,18 +89,18 @@ class UserSession(BaseModel):
     """User session with OAuth token and metadata."""
 
     session_id: str = Field(..., description="Unique session identifier")
-    user_id: Optional[str] = Field(None, description="YouTube user ID")
-    oauth_token: Optional[OAuthToken] = Field(None, description="OAuth token")
+    user_id: str | None = Field(None, description="YouTube user ID")
+    oauth_token: OAuthToken | None = Field(None, description="OAuth token")
     state: AuthState = Field(default=AuthState.PENDING, description="Session state")
 
     # Session metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_accessed: datetime = Field(default_factory=datetime.utcnow)
-    ip_address: Optional[str] = Field(None, description="Client IP address")
-    user_agent: Optional[str] = Field(None, description="Client user agent")
+    ip_address: str | None = Field(None, description="Client IP address")
+    user_agent: str | None = Field(None, description="Client user agent")
 
     # PKCE data for OAuth flow
-    pkce_challenge: Optional[PKCEChallenge] = Field(None, description="PKCE challenge")
+    pkce_challenge: PKCEChallenge | None = Field(None, description="PKCE challenge")
 
     # Rate limiting
     request_count: int = Field(default=0, description="Number of requests made")
@@ -110,7 +110,7 @@ class UserSession(BaseModel):
     )
 
     @classmethod
-    def create_new(cls, ip_address: Optional[str] = None, user_agent: Optional[str] = None) -> "UserSession":
+    def create_new(cls, ip_address: str | None = None, user_agent: str | None = None) -> "UserSession":
         """Create a new user session."""
         session_id = secrets.token_urlsafe(32)
         return cls(

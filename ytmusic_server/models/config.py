@@ -2,8 +2,7 @@
 Configuration models for the YouTube Music MCP server.
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import base64
 
 
@@ -46,7 +45,8 @@ class SecurityConfig(BaseModel):
         default=3, description="Maximum token refresh attempts"
     )
 
-    @validator("encryption_key")
+    @field_validator("encryption_key")
+    @classmethod
     def validate_encryption_key(cls, v: str) -> str:
         """Validate that encryption key is properly formatted."""
         try:
@@ -82,7 +82,7 @@ class ServerConfig(BaseModel):
     refresh_token: str = Field(..., description="Google OAuth refresh token")
 
     # Optional configurations
-    redis_url: Optional[str] = Field(default=None, description="Redis connection URL")
+    redis_url: str | None = Field(default=None, description="Redis connection URL")
     log_level: str = Field(default="INFO", description="Logging level")
     rate_limit_per_minute: int = Field(
         default=60, ge=1, le=300, description="Rate limit per minute per user"
@@ -105,7 +105,8 @@ class ServerConfig(BaseModel):
             rate_limit_per_minute=self.rate_limit_per_minute,
         )
 
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v: str) -> str:
         """Validate log level."""
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}

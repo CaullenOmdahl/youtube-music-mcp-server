@@ -4,10 +4,9 @@ Main MCP server implementation for YouTube Music integration.
 
 import asyncio
 import os
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 import structlog
 from mcp.server.fastmcp import FastMCP
-from mcp import types
 
 from .models.config import ServerConfig
 from .ytmusic.client import YTMusicClient
@@ -58,7 +57,7 @@ class YouTubeMusicMCPServer:
         self._register_health_checks()
 
         # MCP server with HTTP configuration
-        port = int(os.getenv("PORT", "8081"))
+        int(os.getenv("PORT", "8081"))
         self.mcp = FastMCP(
             name="YouTube Music MCP Server",
         )
@@ -108,9 +107,9 @@ class YouTubeMusicMCPServer:
         @self.mcp.tool()
         async def search_music(
             query: str,
-            filter_type: Optional[str] = None,
+            filter_type: str | None = None,
             limit: int = 20,
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """
             Search for music on YouTube Music.
 
@@ -150,9 +149,9 @@ class YouTubeMusicMCPServer:
         @self.mcp.tool()
         async def create_playlist(
             name: str,
-            description: Optional[str] = None,
+            description: str | None = None,
             privacy_status: str = "PRIVATE",
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """
             Create a new playlist on YouTube Music.
 
@@ -187,7 +186,7 @@ class YouTubeMusicMCPServer:
                 return {"success": False, "error": str(e)}
 
         @self.mcp.tool()
-        async def get_playlists(limit: int = 25) -> Dict[str, Any]:
+        async def get_playlists(limit: int = 25) -> dict[str, Any]:
             """
             Get user's playlists from YouTube Music.
 
@@ -220,8 +219,8 @@ class YouTubeMusicMCPServer:
 
         @self.mcp.tool()
         async def add_songs_to_playlist(
-            playlist_id: str, video_ids: List[str]
-        ) -> Dict[str, Any]:
+            playlist_id: str, video_ids: list[str]
+        ) -> dict[str, Any]:
             """
             Add songs to an existing playlist.
 
@@ -261,8 +260,8 @@ class YouTubeMusicMCPServer:
         @self.mcp.tool()
         async def get_playlist_details(
             playlist_id: str,
-            limit: Optional[int] = None,
-        ) -> Dict[str, Any]:
+            limit: int | None = None,
+        ) -> dict[str, Any]:
             """
             Get detailed information about a playlist.
 
@@ -299,7 +298,7 @@ class YouTubeMusicMCPServer:
 
         # Health check endpoint (for Docker/Smithery)
         @self.mcp.tool()
-        async def health_check() -> Dict[str, Any]:
+        async def health_check() -> dict[str, Any]:
             """
             Health check endpoint for monitoring and load balancers.
 
@@ -325,7 +324,7 @@ class YouTubeMusicMCPServer:
 
         # System tools
         @self.mcp.tool()
-        async def get_server_status() -> Dict[str, Any]:
+        async def get_server_status() -> dict[str, Any]:
             """
             Get server health and status information.
 
@@ -386,17 +385,16 @@ if __name__ == "__main__":
     )
 
     def main():
-        import uvicorn
         from starlette.middleware.cors import CORSMiddleware
         from starlette.applications import Starlette
-        from starlette.routing import Mount, Route
+        from starlette.routing import Route
         from starlette.responses import JSONResponse
 
         # Create server instance
         server = create_server()
 
         # Get the Starlette app from FastMCP
-        mcp_app = server.mcp.streamable_http_app()
+        server.mcp.streamable_http_app()
 
         # Get port
         port = int(os.getenv("PORT", "8081"))
@@ -450,13 +448,17 @@ if __name__ == "__main__":
 
                 # Handle tools/list request
                 elif body.get("method") == "tools/list":
+                    # Use the public list_tools method
+                    tools_list = await server.mcp.list_tools()
+
+                    # Convert Tool objects to dict format expected by MCP
                     tools = []
-                    for tool in server.mcp._tools:
+                    for tool in tools_list:
                         tools.append(
                             {
                                 "name": tool.name,
                                 "description": tool.description or "",
-                                "inputSchema": tool.parameters or {},
+                                "inputSchema": tool.inputSchema or {},
                             }
                         )
 
@@ -474,44 +476,31 @@ if __name__ == "__main__":
                     tool_name = params.get("name")
                     arguments = params.get("arguments", {})
 
-                    # Find and call the tool
-                    for tool in server.mcp._tools:
-                        if tool.name == tool_name:
-                            try:
-                                result = await tool.handler(**arguments)
-                                return JSONResponse(
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": body.get("id"),
-                                        "result": {
-                                            "content": [
-                                                {"type": "text", "text": str(result)}
-                                            ]
-                                        },
-                                    }
-                                )
-                            except Exception as e:
-                                return JSONResponse(
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": body.get("id"),
-                                        "error": {
-                                            "code": -32603,
-                                            "message": f"Tool execution failed: {str(e)}",
-                                        },
-                                    }
-                                )
-
-                    return JSONResponse(
-                        {
-                            "jsonrpc": "2.0",
-                            "id": body.get("id"),
-                            "error": {
-                                "code": -32601,
-                                "message": f"Tool not found: {tool_name}",
-                            },
-                        }
-                    )
+                    # Use the public call_tool method
+                    try:
+                        result = await server.mcp.call_tool(tool_name, arguments)
+                        return JSONResponse(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": body.get("id"),
+                                "result": {
+                                    "content": result.content
+                                    if hasattr(result, "content")
+                                    else [{"type": "text", "text": str(result)}]
+                                },
+                            }
+                        )
+                    except Exception as e:
+                        return JSONResponse(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": body.get("id"),
+                                "error": {
+                                    "code": -32603,
+                                    "message": f"Tool execution failed: {str(e)}",
+                                },
+                            }
+                        )
 
                 else:
                     return JSONResponse(

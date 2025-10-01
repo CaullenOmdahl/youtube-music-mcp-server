@@ -3,8 +3,8 @@ Session manager for user authentication and session lifecycle.
 """
 
 import asyncio
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from typing import Any
+from datetime import datetime
 import structlog
 
 from ..models.auth import UserSession, AuthState, OAuthToken
@@ -33,8 +33,8 @@ class SessionManager:
         self.storage = token_storage
         self.config = security_config
         self.logger = logger.bind(component="session_manager")
-        self._sessions: Dict[str, UserSession] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._sessions: dict[str, UserSession] = {}
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start the session manager and cleanup task."""
@@ -53,8 +53,8 @@ class SessionManager:
 
     async def create_session(
         self,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> UserSession:
         """
         Create a new user session.
@@ -80,7 +80,7 @@ class SessionManager:
 
         return session
 
-    async def get_session(self, session_id: str) -> Optional[UserSession]:
+    async def get_session(self, session_id: str) -> UserSession | None:
         """
         Get session by ID.
 
@@ -174,8 +174,8 @@ class SessionManager:
         self,
         session_id: str,
         oauth_token: OAuthToken,
-        user_id: Optional[str] = None,
-    ) -> Optional[UserSession]:
+        user_id: str | None = None,
+    ) -> UserSession | None:
         """
         Authenticate session with OAuth token.
 
@@ -214,7 +214,7 @@ class SessionManager:
     async def check_rate_limit(
         self,
         session_id: str,
-        max_requests: Optional[int] = None,
+        max_requests: int | None = None,
     ) -> bool:
         """
         Check if session is within rate limits.
@@ -270,7 +270,7 @@ class SessionManager:
             try:
                 await asyncio.sleep(300)  # Run every 5 minutes
 
-                current_time = datetime.utcnow()
+                datetime.utcnow()
                 expired_sessions = []
 
                 # Check memory cache
@@ -299,7 +299,7 @@ class SessionManager:
                 # Continue running despite errors
                 await asyncio.sleep(60)  # Wait before retrying
 
-    async def get_session_stats(self) -> Dict[str, Any]:
+    async def get_session_stats(self) -> dict[str, Any]:
         """
         Get session statistics.
 

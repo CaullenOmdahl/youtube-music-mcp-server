@@ -5,7 +5,6 @@ Security validators for input validation and security checks.
 import re
 import secrets
 import urllib.parse
-from typing import Optional, List, Set, Dict, Any
 from ipaddress import ip_address, AddressValueError
 import structlog
 
@@ -31,11 +30,11 @@ class SecurityValidator:
 
     def __init__(
         self,
-        allowed_ips: Optional[List[str]] = None,
-        blocked_ips: Optional[List[str]] = None,
+        allowed_ips: list[str | None] = None,
+        blocked_ips: list[str | None] = None,
     ):
-        self.allowed_ips: Set[str] = set(allowed_ips or [])
-        self.blocked_ips: Set[str] = set(blocked_ips or [])
+        self.allowed_ips: set[str] = set(allowed_ips or [])
+        self.blocked_ips: set[str] = set(blocked_ips or [])
         self.logger = logger.bind(component="security_validator")
 
         self.logger.info(
@@ -59,7 +58,7 @@ class SecurityValidator:
         """
         try:
             # Validate IP format
-            ip_obj = ip_address(ip_addr)
+            ip_address(ip_addr)
 
             # Check if IP is blocked
             if self.blocked_ips and ip_addr in self.blocked_ips:
@@ -159,7 +158,7 @@ class SecurityValidator:
         self.logger.debug("PKCE code verifier validated", verifier_length=len(code_verifier))
         return True
 
-    def validate_redirect_uri(self, redirect_uri: str, allowed_domains: List[str]) -> bool:
+    def validate_redirect_uri(self, redirect_uri: str, allowed_domains: list[str]) -> bool:
         """
         Validate OAuth redirect URI.
 
@@ -221,7 +220,7 @@ class SecurityValidator:
         self.logger.debug("Session ID validated", session_id=session_id[:8] + "...")
         return True
 
-    def validate_user_agent(self, user_agent: Optional[str]) -> bool:
+    def validate_user_agent(self, user_agent: str | None) -> bool:
         """
         Validate user agent string.
 
@@ -281,7 +280,7 @@ class SecurityValidator:
         """
         return secrets.token_urlsafe(length)
 
-    def validate_request_size(self, content_length: Optional[int], max_size: int = 1024 * 1024) -> bool:
+    def validate_request_size(self, content_length: int | None, max_size: int = 1024 * 1024) -> bool:
         """
         Validate request content size.
 

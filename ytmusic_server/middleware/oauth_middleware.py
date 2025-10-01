@@ -7,7 +7,7 @@ headers and token validation.
 
 import os
 import re
-from typing import Optional, Dict, Any
+from typing import Any
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
@@ -91,7 +91,7 @@ class OAuthMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    def _extract_bearer_token(self, auth_header: str) -> Optional[str]:
+    def _extract_bearer_token(self, auth_header: str) -> str | None:
         """Extract bearer token from Authorization header."""
         if not auth_header:
             return None
@@ -99,7 +99,7 @@ class OAuthMiddleware(BaseHTTPMiddleware):
         match = re.match(r"Bearer\s+(.+)", auth_header, re.IGNORECASE)
         return match.group(1) if match else None
 
-    async def _validate_token(self, token: str) -> Optional[Dict[str, Any]]:
+    async def _validate_token(self, token: str) -> dict[str, Any | None]:
         """
         Validate OAuth access token.
 

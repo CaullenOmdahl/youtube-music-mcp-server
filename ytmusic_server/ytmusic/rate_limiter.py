@@ -4,9 +4,8 @@ Rate limiter for YouTube Music API requests.
 
 import asyncio
 import time
-from typing import Dict, Optional, Any
+from typing import Any
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -43,10 +42,10 @@ class RateLimiter:
         self.logger = logger.bind(component="rate_limiter")
 
         # Rate limiting storage
-        self._minute_requests: Dict[str, deque] = defaultdict(deque)
-        self._hour_requests: Dict[str, deque] = defaultdict(deque)
-        self._burst_requests: Dict[str, deque] = defaultdict(deque)
-        self._violation_counts: Dict[str, int] = defaultdict(int)
+        self._minute_requests: dict[str, deque] = defaultdict(deque)
+        self._hour_requests: dict[str, deque] = defaultdict(deque)
+        self._burst_requests: dict[str, deque] = defaultdict(deque)
+        self._violation_counts: dict[str, int] = defaultdict(int)
         self._last_cleanup = time.time()
 
         self.logger.info(
@@ -269,7 +268,7 @@ class RateLimiter:
                 active_sessions=len(self._minute_requests),
             )
 
-    async def get_rate_limit_status(self, session_id: str) -> Dict[str, Any]:
+    async def get_rate_limit_status(self, session_id: str) -> dict[str, Any]:
         """
         Get current rate limit status for a session.
 
@@ -317,7 +316,7 @@ class RateLimiter:
             "violations": self._violation_counts.get(session_id, 0),
         }
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """
         Get overall rate limiter statistics.
 

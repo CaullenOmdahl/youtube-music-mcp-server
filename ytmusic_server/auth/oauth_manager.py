@@ -2,16 +2,14 @@
 OAuth 2.1 manager with PKCE implementation for secure authentication.
 """
 
-import asyncio
 import secrets
-from typing import Optional, Dict, Any
-from urllib.parse import urlencode, parse_qs, urlparse
+from urllib.parse import urlencode
 import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from ..models.config import OAuthConfig
-from ..models.auth import OAuthToken, PKCEChallenge, AuthState
+from ..models.auth import OAuthToken, PKCEChallenge
 from ..security.encryption import EncryptionManager
 
 logger = structlog.get_logger(__name__)

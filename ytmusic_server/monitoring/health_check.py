@@ -4,7 +4,7 @@ Health check system for monitoring server status and dependencies.
 
 import asyncio
 import time
-from typing import Dict, Any, Optional, List, Callable, Awaitable
+from typing import Any, Callable, Awaitable
 from dataclasses import dataclass
 from enum import Enum
 import structlog
@@ -26,8 +26,8 @@ class HealthCheckResult:
     name: str
     status: HealthStatus
     duration_ms: float
-    message: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    message: str | None = None
+    details: dict[str, Any | None] = None
     timestamp: float = 0.0
 
     def __post_init__(self):
@@ -59,10 +59,10 @@ class HealthChecker:
         self.logger = logger.bind(component="health_checker")
 
         # Health check registry
-        self._checks: Dict[str, Callable[[], Awaitable[HealthCheckResult]]] = {}
-        self._last_results: Dict[str, HealthCheckResult] = {}
-        self._health_history: List[Dict[str, Any]] = []
-        self._check_task: Optional[asyncio.Task] = None
+        self._checks: dict[str, Callable[[], Awaitable[HealthCheckResult]]] = {}
+        self._last_results: dict[str, HealthCheckResult] = {}
+        self._health_history: list[dict[str, Any]] = []
+        self._check_task: asyncio.Task | None = None
         self._running = False
 
         self.logger.info(
@@ -111,7 +111,7 @@ class HealthChecker:
 
         self.logger.info("Health checker stopped")
 
-    async def run_checks(self) -> Dict[str, HealthCheckResult]:
+    async def run_checks(self) -> dict[str, HealthCheckResult]:
         """
         Run all registered health checks.
 
@@ -178,7 +178,7 @@ class HealthChecker:
 
         return results
 
-    async def get_health_status(self) -> Dict[str, Any]:
+    async def get_health_status(self) -> dict[str, Any]:
         """
         Get current health status.
 
@@ -292,7 +292,7 @@ class HealthChecker:
                 # Continue after error, but wait a bit
                 await asyncio.sleep(min(self.check_interval, 30))
 
-    def get_health_history(self) -> List[Dict[str, Any]]:
+    def get_health_history(self) -> list[dict[str, Any]]:
         """
         Get health check history.
 

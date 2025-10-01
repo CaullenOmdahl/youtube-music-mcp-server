@@ -3,10 +3,10 @@ Metrics collection and monitoring for the YouTube Music MCP server.
 """
 
 import time
-from typing import Dict, Any, Optional, List
+from typing import Any
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
+from datetime import datetime
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -20,8 +20,8 @@ class RequestMetrics:
     method: str
     duration: float
     success: bool
-    error_type: Optional[str] = None
-    response_size: Optional[int] = None
+    error_type: str | None = None
+    response_size: int | None = None
 
 
 @dataclass
@@ -62,10 +62,10 @@ class MetricsCollector:
 
         # Storage for metrics
         self._requests: deque = deque(maxlen=max_requests_stored)
-        self._sessions: Dict[str, SessionMetrics] = {}
-        self._oauth_flows: Dict[str, Dict[str, Any]] = {}
+        self._sessions: dict[str, SessionMetrics] = {}
+        self._oauth_flows: dict[str, dict[str, Any]] = {}
         self._rate_limit_violations: deque = deque(maxlen=1000)
-        self._error_counts: Dict[str, int] = defaultdict(int)
+        self._error_counts: dict[str, int] = defaultdict(int)
         self._last_cleanup = time.time()
 
         # Server startup metrics
@@ -85,8 +85,8 @@ class MetricsCollector:
         method: str,
         duration: float,
         success: bool,
-        error_type: Optional[str] = None,
-        response_size: Optional[int] = None,
+        error_type: str | None = None,
+        response_size: int | None = None,
     ) -> None:
         """
         Record metrics for a request.
@@ -169,7 +169,7 @@ class MetricsCollector:
         self,
         session_id: str,
         success: bool,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """
         Record the completion of an OAuth flow.
@@ -257,7 +257,7 @@ class MetricsCollector:
         retention_threshold = current_time - (self.retention_hours * 3600)
 
         # Clean up old requests (deque handles this automatically)
-        initial_request_count = len(self._requests)
+        len(self._requests)
 
         # Clean up old sessions
         expired_sessions = [
@@ -290,7 +290,7 @@ class MetricsCollector:
                 active_sessions=len(self._sessions),
             )
 
-    def get_summary_metrics(self) -> Dict[str, Any]:
+    def get_summary_metrics(self) -> dict[str, Any]:
         """
         Get summary metrics for the server.
 
@@ -344,7 +344,7 @@ class MetricsCollector:
             "errors": dict(self._error_counts),
         }
 
-    def get_session_metrics(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session_metrics(self, session_id: str) -> dict[str, Any | None]:
         """
         Get metrics for a specific session.
 
@@ -372,7 +372,7 @@ class MetricsCollector:
             "oauth_flow": oauth_flow,
         }
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """
         Get performance-related metrics.
 

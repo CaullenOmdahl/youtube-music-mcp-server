@@ -3,7 +3,7 @@ Security middleware for request validation and protection.
 """
 
 import time
-from typing import Dict, Optional, Any, Callable, Awaitable
+from typing import Any
 from collections import defaultdict, deque
 import structlog
 
@@ -42,7 +42,7 @@ class SecurityMiddleware:
         self.logger = logger.bind(component="security_middleware")
 
         # Rate limiting storage
-        self._rate_limit_storage: Dict[str, deque] = defaultdict(deque)
+        self._rate_limit_storage: dict[str, deque] = defaultdict(deque)
 
         self.logger.info(
             "Security middleware initialized",
@@ -53,10 +53,10 @@ class SecurityMiddleware:
 
     async def validate_request(
         self,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        content_length: Optional[int] = None,
-        session_id: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        content_length: int | None = None,
+        session_id: str | None = None,
     ) -> bool:
         """
         Validate incoming request for security compliance.
@@ -159,7 +159,7 @@ class SecurityMiddleware:
 
         return True
 
-    def get_security_headers(self) -> Dict[str, str]:
+    def get_security_headers(self) -> dict[str, str]:
         """
         Get security headers to include in responses.
 
@@ -186,7 +186,7 @@ class SecurityMiddleware:
         cleaned_count = 0
         for identifier, requests in list(self._rate_limit_storage.items()):
             # Remove old requests
-            initial_count = len(requests)
+            len(requests)
             while requests and requests[0] < window_start:
                 requests.popleft()
 
@@ -202,7 +202,7 @@ class SecurityMiddleware:
                 active_identifiers=len(self._rate_limit_storage),
             )
 
-    def get_rate_limit_status(self, identifier: str) -> Dict[str, Any]:
+    def get_rate_limit_status(self, identifier: str) -> dict[str, Any]:
         """
         Get current rate limit status for an identifier.
 

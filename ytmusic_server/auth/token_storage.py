@@ -2,10 +2,8 @@
 Token storage implementations for sessions and OAuth tokens.
 """
 
-import asyncio
-import json
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Union
+from typing import Any
 import redis.asyncio as redis
 import structlog
 
@@ -18,12 +16,12 @@ class TokenStorage(ABC):
     """Abstract base class for token storage implementations."""
 
     @abstractmethod
-    async def store_session(self, session_id: str, session_data: Dict[str, Any]) -> None:
+    async def store_session(self, session_id: str, session_data: dict[str, Any]) -> None:
         """Store session data."""
         pass
 
     @abstractmethod
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any | None]:
         """Retrieve session data."""
         pass
 
@@ -33,12 +31,12 @@ class TokenStorage(ABC):
         pass
 
     @abstractmethod
-    async def store_token(self, key: str, token_data: Dict[str, Any], ttl: Optional[int] = None) -> None:
+    async def store_token(self, key: str, token_data: dict[str, Any], ttl: int | None = None) -> None:
         """Store token data."""
         pass
 
     @abstractmethod
-    async def get_token(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_token(self, key: str) -> dict[str, Any | None]:
         """Retrieve token data."""
         pass
 
@@ -58,12 +56,12 @@ class MemoryTokenStorage(TokenStorage):
     def __init__(self, encryption_manager: EncryptionManager):
         self.encryption_manager = encryption_manager
         self.logger = logger.bind(component="memory_storage")
-        self._sessions: Dict[str, str] = {}  # Encrypted data
-        self._tokens: Dict[str, str] = {}    # Encrypted data
+        self._sessions: dict[str, str] = {}  # Encrypted data
+        self._tokens: dict[str, str] = {}    # Encrypted data
 
         self.logger.info("Memory token storage initialized")
 
-    async def store_session(self, session_id: str, session_data: Dict[str, Any]) -> None:
+    async def store_session(self, session_id: str, session_data: dict[str, Any]) -> None:
         """Store encrypted session data in memory."""
         try:
             encrypted_data = self.encryption_manager.encrypt(session_data)
@@ -81,7 +79,7 @@ class MemoryTokenStorage(TokenStorage):
             )
             raise
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any | None]:
         """Retrieve and decrypt session data from memory."""
         try:
             encrypted_data = self._sessions.get(session_id)
@@ -113,7 +111,7 @@ class MemoryTokenStorage(TokenStorage):
                 session_id=session_id[:8] + "...",
             )
 
-    async def store_token(self, key: str, token_data: Dict[str, Any], ttl: Optional[int] = None) -> None:
+    async def store_token(self, key: str, token_data: dict[str, Any], ttl: int | None = None) -> None:
         """Store encrypted token data in memory."""
         try:
             encrypted_data = self.encryption_manager.encrypt(token_data)
@@ -132,7 +130,7 @@ class MemoryTokenStorage(TokenStorage):
             )
             raise
 
-    async def get_token(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_token(self, key: str) -> dict[str, Any | None]:
         """Retrieve and decrypt token data from memory."""
         try:
             encrypted_data = self._tokens.get(key)
@@ -180,7 +178,7 @@ class RedisTokenStorage(TokenStorage):
         self.encryption_manager = encryption_manager
         self.redis_url = redis_url
         self.logger = logger.bind(component="redis_storage")
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
 
     async def _get_redis(self) -> redis.Redis:
         """Get Redis connection with lazy initialization."""
@@ -214,7 +212,7 @@ class RedisTokenStorage(TokenStorage):
 
         return self._redis
 
-    async def store_session(self, session_id: str, session_data: Dict[str, Any]) -> None:
+    async def store_session(self, session_id: str, session_data: dict[str, Any]) -> None:
         """Store encrypted session data in Redis."""
         try:
             redis_client = await self._get_redis()
@@ -235,7 +233,7 @@ class RedisTokenStorage(TokenStorage):
             )
             raise
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any | None]:
         """Retrieve and decrypt session data from Redis."""
         try:
             redis_client = await self._get_redis()
@@ -280,7 +278,7 @@ class RedisTokenStorage(TokenStorage):
                 error=str(e),
             )
 
-    async def store_token(self, key: str, token_data: Dict[str, Any], ttl: Optional[int] = None) -> None:
+    async def store_token(self, key: str, token_data: dict[str, Any], ttl: int | None = None) -> None:
         """Store encrypted token data in Redis."""
         try:
             redis_client = await self._get_redis()
@@ -305,7 +303,7 @@ class RedisTokenStorage(TokenStorage):
             )
             raise
 
-    async def get_token(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_token(self, key: str) -> dict[str, Any | None]:
         """Retrieve and decrypt token data from Redis."""
         try:
             redis_client = await self._get_redis()

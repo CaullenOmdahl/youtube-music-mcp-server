@@ -5,8 +5,7 @@ Provides OAuth 2.0 Protected Resource Metadata for MCP clients to discover
 authorization servers and required scopes.
 """
 
-import os
-from typing import Dict, List, Any
+from typing import Any
 from pydantic import BaseModel, AnyHttpUrl
 import structlog
 
@@ -19,9 +18,9 @@ class ProtectedResourceMetadata(BaseModel):
     """OAuth 2.0 Protected Resource Metadata (RFC 9728)."""
 
     resource: AnyHttpUrl
-    authorization_servers: List[AnyHttpUrl]
-    scopes_supported: List[str]
-    bearer_methods_supported: List[str] = ["header"]
+    authorization_servers: list[AnyHttpUrl]
+    scopes_supported: list[str]
+    bearer_methods_supported: list[str] = ["header"]
     resource_documentation: str = "https://github.com/CaullenOmdahl/youtube-music-mcp-server"
 
 
@@ -32,7 +31,7 @@ class ResourceMetadataHandler:
         # Use config URLs, ignore parameters for backward compatibility
         self.logger = logger.bind(component="resource_metadata")
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self) -> dict[str, Any]:
         """
         Get RFC 9728 Protected Resource Metadata.
 
@@ -58,7 +57,7 @@ class ResourceMetadataHandler:
 
         return metadata.model_dump(mode='json')
 
-    def get_authorization_server_metadata(self) -> Dict[str, Any]:
+    def get_authorization_server_metadata(self) -> dict[str, Any]:
         """
         Get OAuth Authorization Server Metadata.
 
