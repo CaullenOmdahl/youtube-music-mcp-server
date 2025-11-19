@@ -82,25 +82,31 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
   }
 
   /**
-   * Override authorize to always include our required YouTube scopes
+   * Override authorize to use our registered redirect_uri and scopes
    */
   override async authorize(
     client: OAuthClientInformationFull,
     params: AuthorizationParams,
     res: Response
   ): Promise<void> {
-    // Ensure our required scopes are always included
-    const paramsWithScopes: AuthorizationParams = {
+    // Use our registered redirect_uri for Google
+    // Google only accepts URIs registered in Cloud Console
+    const googleRedirectUri = config.googleRedirectUri ||
+      'https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback';
+
+    const paramsWithFixes: AuthorizationParams = {
       ...params,
       scopes: YOUTUBE_SCOPES,
+      redirectUri: googleRedirectUri,
     };
 
-    logger.debug('Authorizing with scopes', {
-      scopes: paramsWithScopes.scopes,
-      clientId: client.client_id,
+    logger.debug('Authorizing with Google', {
+      scopes: paramsWithFixes.scopes,
+      redirectUri: paramsWithFixes.redirectUri,
+      originalRedirectUri: params.redirectUri,
     });
 
-    return super.authorize(client, paramsWithScopes, res);
+    return super.authorize(client, paramsWithFixes, res);
   }
 }
 
