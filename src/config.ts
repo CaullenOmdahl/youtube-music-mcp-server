@@ -50,9 +50,9 @@ function loadConfig() {
 
     googleClientId: process.env['GOOGLE_OAUTH_CLIENT_ID'] ?? '',
     googleClientSecret: process.env['GOOGLE_OAUTH_CLIENT_SECRET'] ?? '',
-    googleRedirectUri: process.env['GOOGLE_REDIRECT_URI'],
+    googleRedirectUri: process.env['GOOGLE_REDIRECT_URI'] || undefined,
 
-    encryptionKey: process.env['ENCRYPTION_KEY'],
+    encryptionKey: process.env['ENCRYPTION_KEY'] || undefined,
 
     rateLimitPerMinute: parseInt(process.env['RATE_LIMIT_PER_MINUTE'] ?? '60', 10),
     rateLimitPerHour: parseInt(process.env['RATE_LIMIT_PER_HOUR'] ?? '1000', 10),
@@ -61,7 +61,7 @@ function loadConfig() {
     musicBrainzRateLimit: parseInt(process.env['MUSICBRAINZ_RATE_LIMIT'] ?? '1000', 10),
     musicBrainzUserAgent: process.env['MUSICBRAINZ_USER_AGENT'] ?? 'YouTubeMusicMCPServer/3.0.0',
 
-    redisUrl: process.env['REDIS_URL'],
+    redisUrl: process.env['REDIS_URL'] || undefined,
 
     sessionTtl: parseInt(process.env['SESSION_TTL'] ?? '3600', 10),
 
