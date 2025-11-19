@@ -53,34 +53,34 @@ smithery deploy
 
 ```
 ├── src/
-│   ├── index.ts                    # Entry point, exports OAuth provider
-│   ├── server.ts                   # MCP server with HTTP transport
-│   ├── config.ts                   # Configuration management
+│   ├── index.ts              # Entry point, exports OAuth provider
+│   ├── server.ts             # MCP server with HTTP transport
+│   ├── config.ts             # Configuration management
 │   ├── auth/
 │   │   ├── smithery-oauth-provider.ts  # Smithery OAuth integration
-│   │   └── token-store.ts          # Shared token storage
+│   │   └── token-store.ts    # Shared token storage
 │   ├── youtube-music/
-│   │   ├── client.ts               # YouTube Music API client
-│   │   └── parsers.ts              # Response parsers
+│   │   ├── client.ts         # YouTube Music API client
+│   │   └── parsers.ts        # Response parsers
 │   ├── musicbrainz/
-│   │   └── client.ts               # MusicBrainz API client
+│   │   └── client.ts         # MusicBrainz API client
 │   ├── listenbrainz/
-│   │   └── client.ts               # ListenBrainz API client
+│   │   └── client.ts         # ListenBrainz API client
 │   ├── recommendations/
-│   │   ├── engine.ts               # Recommendation engine
-│   │   └── session.ts              # Playlist session management
+│   │   ├── engine.ts         # Recommendation engine
+│   │   └── session.ts        # Playlist session management
 │   ├── tools/
-│   │   ├── query.ts                # Search and info tools (7)
-│   │   ├── playlist.ts             # Playlist CRUD tools (7)
-│   │   ├── smart-playlist.ts       # Smart playlist tools (8)
-│   │   └── system.ts               # Auth/status tools (2)
+│   │   ├── query.ts          # Search and info tools (7)
+│   │   ├── playlist.ts       # Playlist CRUD tools (7)
+│   │   ├── smart-playlist.ts # Smart playlist tools (8)
+│   │   └── system.ts         # Auth/status tools (2)
 │   ├── types/
-│   │   └── index.ts                # Zod schemas and types
+│   │   └── index.ts          # Zod schemas and types
 │   └── utils/
-│       ├── logger.ts               # Structured logging
-│       └── rate-limiter.ts         # Rate limiting
-├── smithery.yaml                   # Smithery deployment config
-├── Dockerfile                      # Container build
+│       ├── logger.ts         # Structured logging
+│       └── rate-limiter.ts   # Rate limiting
+├── smithery.yaml             # Smithery deployment config
+├── Dockerfile                # Container build
 └── package.json
 ```
 
