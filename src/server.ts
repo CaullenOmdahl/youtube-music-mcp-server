@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import express, { Express, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -15,6 +16,7 @@ import { MusicBrainzClient } from './musicbrainz/client.js';
 import { ListenBrainzClient } from './listenbrainz/client.js';
 import { RecommendationEngine } from './recommendations/engine.js';
 import { SessionManager } from './recommendations/session.js';
+import { oauth } from './auth/smithery-oauth-provider.js';
 
 const logger = createLogger('server');
 
@@ -79,8 +81,18 @@ export async function createServer(): Promise<Server> {
     });
   });
 
-  // Note: OAuth routes are automatically handled by Smithery
-  // The oauth provider is exported from index.ts and Smithery mounts it during deployment
+  // Mount OAuth routes using MCP SDK's mcpAuthRouter for local testing
+  // In production, Smithery handles these automatically
+  app.use(
+    mcpAuthRouter({
+      provider: oauth,
+      issuerUrl: new URL('https://accounts.google.com'),
+      baseUrl: new URL(config.googleRedirectUri || `http://localhost:${config.port}`),
+      serviceDocumentationUrl: new URL('https://github.com/CaullenOmdahl/youtube-music-mcp-server'),
+    })
+  );
+
+  logger.info('OAuth routes mounted for local testing');
 
   // Store transports for session management
   const transports: {
