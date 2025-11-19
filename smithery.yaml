@@ -1,7 +1,3 @@
-name: youtube-music-mcp-server
-version: 3.0.0
-description: Enterprise-grade MCP server for YouTube Music with smart playlist creation using MusicBrainz and ListenBrainz
-
 runtime: "typescript"
 
 env:
