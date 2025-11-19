@@ -18,69 +18,25 @@ startCommand:
         description: Google OAuth 2.0 Client Secret
       GOOGLE_REDIRECT_URI:
         type: string
-        description: OAuth redirect URI (must match Google Cloud Console configuration)
+        description: OAuth redirect URI
       ENCRYPTION_KEY:
         type: string
-        description: Base64-encoded 32-byte encryption key for token storage
-      RATE_LIMIT_PER_MINUTE:
-        type: number
-        description: Maximum requests per minute
-        default: 60
-      PORT:
-        type: number
-        description: HTTP server port
-        default: 8081
+        description: Base64-encoded 32-byte encryption key
     required:
       - GOOGLE_OAUTH_CLIENT_ID
       - GOOGLE_OAUTH_CLIENT_SECRET
       - GOOGLE_REDIRECT_URI
-
-tools:
-  - name: search_songs
-    description: Search for songs on YouTube Music
-  - name: search_albums
-    description: Search for albums on YouTube Music
-  - name: search_artists
-    description: Search for artists on YouTube Music
-  - name: get_song_info
-    description: Get detailed song information
-  - name: get_album_info
-    description: Get album with all tracks
-  - name: get_artist_info
-    description: Get artist with top songs
-  - name: get_library_songs
-    description: Get user's liked songs
-  - name: get_playlists
-    description: Get user's playlists
-  - name: get_playlist_details
-    description: Get playlist with tracks
-  - name: create_playlist
-    description: Create a new playlist
-  - name: edit_playlist
-    description: Edit playlist metadata
-  - name: delete_playlist
-    description: Delete a playlist
-  - name: add_songs_to_playlist
-    description: Add songs to playlist (batch)
-  - name: remove_songs_from_playlist
-    description: Remove songs from playlist (batch)
-  - name: start_smart_playlist
-    description: Start smart playlist session
-  - name: add_seed_artist
-    description: Add seed artist for recommendations
-  - name: add_seed_track
-    description: Add seed track for recommendations
-  - name: refine_recommendations
-    description: Adjust recommendation parameters
-  - name: get_recommendations
-    description: Generate playlist recommendations
-  - name: preview_playlist
-    description: Preview smart playlist
-  - name: create_smart_playlist
-    description: Create smart playlist on YouTube Music
-  - name: get_user_taste_profile
-    description: Analyze user's music taste
-  - name: get_auth_status
-    description: Check authentication status
-  - name: get_server_status
-    description: Get server health metrics
+      - ENCRYPTION_KEY
+  commandFunction: |
+    (config) => ({
+      command: 'node',
+      args: ['dist/index.js'],
+      env: {
+        GOOGLE_OAUTH_CLIENT_ID: config.GOOGLE_OAUTH_CLIENT_ID,
+        GOOGLE_OAUTH_CLIENT_SECRET: config.GOOGLE_OAUTH_CLIENT_SECRET,
+        GOOGLE_REDIRECT_URI: config.GOOGLE_REDIRECT_URI,
+        ENCRYPTION_KEY: config.ENCRYPTION_KEY,
+        PORT: '8081',
+        NODE_ENV: 'production'
+      }
+    })
