@@ -102,12 +102,22 @@ export async function createServer(): Promise<Server> {
 
   logger.info('OAuth router base URL', { baseUrl: baseUrl.toString() });
 
+  // Rate limit config that works behind proxies
+  const rateLimitConfig = {
+    validate: { xForwardedForHeader: false }
+  };
+
   app.use(
     mcpAuthRouter({
       provider: oauth,
       issuerUrl: new URL('https://accounts.google.com'),
       baseUrl,
       serviceDocumentationUrl: new URL('https://github.com/CaullenOmdahl/youtube-music-mcp-server'),
+      // Configure rate limiting to work behind reverse proxies
+      authorizationOptions: { rateLimit: rateLimitConfig },
+      tokenOptions: { rateLimit: rateLimitConfig },
+      clientRegistrationOptions: { rateLimit: rateLimitConfig },
+      revocationOptions: { rateLimit: rateLimitConfig },
     })
   );
 

@@ -103,15 +103,14 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     params: AuthorizationParams,
     res: Response
   ): Promise<void> {
-    // Use our registered redirect_uri for Google
-    // Google only accepts URIs registered in Cloud Console
-    const googleRedirectUri = config.googleRedirectUri ||
-      'https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback';
+    // Important: redirect_uri must match what's registered in Google Cloud Console
+    // For Smithery: use the client's redirect_uri (Smithery handles the callback)
+    // The client's redirect_uri will be something like https://smithery.ai/chat/callback
 
     const paramsWithFixes: AuthorizationParams = {
       ...params,
       scopes: YOUTUBE_SCOPES,
-      redirectUri: googleRedirectUri,
+      // Use client's redirect_uri - Smithery infrastructure handles callbacks
     };
 
     logger.debug('Authorizing with Google', {
@@ -124,22 +123,21 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
   }
 
   /**
-   * Override exchangeAuthorizationCode to use our registered redirect_uri
+   * Override exchangeAuthorizationCode to pass through the client's redirect_uri
    * Google requires the redirect_uri to match the one used in authorize
    */
   override async exchangeAuthorizationCode(
     client: OAuthClientInformationFull,
     authorizationCode: string,
     codeVerifier?: string,
-    _redirectUri?: string,
+    redirectUri?: string,
     resource?: URL
   ) {
-    // Use our registered redirect_uri, not the one from the callback
-    const googleRedirectUri = config.googleRedirectUri ||
-      'https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback';
+    // Use the redirectUri that was passed in (from the client)
+    // This must match what was sent to Google in the authorize step
 
     logger.info('Exchanging authorization code', {
-      redirectUri: googleRedirectUri,
+      redirectUri,
       clientId: client.client_id,
       hasCodeVerifier: !!codeVerifier,
       hasResource: !!resource,
@@ -150,7 +148,7 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
         client,
         authorizationCode,
         codeVerifier,
-        googleRedirectUri,
+        redirectUri, // Pass through the client's redirect_uri
         resource
       );
 
