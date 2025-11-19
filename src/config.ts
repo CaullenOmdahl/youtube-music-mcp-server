@@ -32,9 +32,6 @@ const ConfigSchema = z.object({
   // Redis (optional)
   redisUrl: z.string().url().optional(),
 
-  // YouTube Music Cookies (for authenticated requests)
-  youtubeMusicCookies: z.string().optional(), // JSON string of cookies
-
   // Session
   sessionTtl: z.number().default(3600), // 1 hour in seconds
 
@@ -65,8 +62,6 @@ function loadConfig() {
     musicBrainzUserAgent: process.env['MUSICBRAINZ_USER_AGENT'] ?? 'YouTubeMusicMCPServer/3.0.0',
 
     redisUrl: process.env['REDIS_URL'] || undefined,
-
-    youtubeMusicCookies: process.env['YOUTUBE_MUSIC_COOKIES'] || undefined,
 
     sessionTtl: parseInt(process.env['SESSION_TTL'] ?? '3600', 10),
 
