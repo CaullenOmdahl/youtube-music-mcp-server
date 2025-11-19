@@ -1,8 +1,11 @@
 import { ProxyOAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/providers/proxyProvider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
 import type { OAuthProvider } from '@smithery/sdk';
 import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
+import { randomUUID } from 'crypto';
 
 const logger = createLogger('smithery-oauth');
 
@@ -17,12 +20,64 @@ const YOUTUBE_SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
 ];
 
+// In-memory store for dynamically registered clients
+const registeredClients = new Map<string, OAuthClientInformationFull>();
+
+/**
+ * Extended ProxyOAuthServerProvider with dynamic client registration support
+ */
+class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
+  private _dynamicClientsStore: OAuthRegisteredClientsStore;
+
+  constructor(options: ConstructorParameters<typeof ProxyOAuthServerProvider>[0]) {
+    super(options);
+
+    // Create a clients store that supports dynamic registration
+    this._dynamicClientsStore = {
+      getClient: (clientId: string) => {
+        // First check registered clients, then fall back to the base getClient
+        const registered = registeredClients.get(clientId);
+        if (registered) {
+          return registered;
+        }
+        return options.getClient(clientId);
+      },
+
+      registerClient: (client) => {
+        const clientId = randomUUID();
+        const clientSecret = randomUUID();
+
+        const fullClientInfo: OAuthClientInformationFull = {
+          ...client,
+          client_id: clientId,
+          client_secret: clientSecret,
+          client_id_issued_at: Math.floor(Date.now() / 1000),
+        };
+
+        registeredClients.set(clientId, fullClientInfo);
+
+        logger.info('Client registered dynamically', {
+          clientId,
+          clientName: client.client_name,
+          redirectUris: client.redirect_uris
+        });
+
+        return fullClientInfo;
+      },
+    };
+  }
+
+  override get clientsStore(): OAuthRegisteredClientsStore {
+    return this._dynamicClientsStore;
+  }
+}
+
 /**
  * Create OAuth provider using MCP SDK's ProxyOAuthServerProvider
  * This proxies OAuth requests to Google
  */
 function createOAuthProvider(): OAuthProvider {
-  const provider = new ProxyOAuthServerProvider({
+  const provider = new DynamicClientProxyProvider({
     endpoints: {
       authorizationUrl: GOOGLE_AUTH_URL,
       tokenUrl: GOOGLE_TOKEN_URL,
