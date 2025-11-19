@@ -47,22 +47,13 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
         });
 
         if (registered) {
-          // Return client info with OUR Google credentials for proxying
-          // but keep the registered client's redirect_uris for validation
-          const clientInfo = {
-            ...registered,
-            // Use our Google OAuth credentials for the actual proxy request
-            client_id: config.googleClientId,
-            client_secret: config.googleClientSecret,
-            scope: YOUTUBE_SCOPES.join(' '),
-          };
-
-          logger.debug('Returning client with Google credentials', {
-            originalClientId: clientId,
-            googleClientId: config.googleClientId,
+          // Return the registered client info AS-IS for validation
+          // We'll swap in Google's credentials during the token exchange
+          logger.debug('Returning registered client info', {
+            clientId: registered.client_id,
           });
 
-          return clientInfo;
+          return registered;
         }
         return options.getClient(clientId);
       },
@@ -76,6 +67,7 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
           client_id: clientId,
           client_secret: clientSecret,
           client_id_issued_at: Math.floor(Date.now() / 1000),
+          scope: YOUTUBE_SCOPES.join(' '),
         };
 
         registeredClients.set(clientId, fullClientInfo);
@@ -123,6 +115,14 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     });
     const encodedState = Buffer.from(stateData).toString('base64url');
 
+    // Create a client object with Google's credentials for the authorization request
+    const googleClient: OAuthClientInformationFull = {
+      ...client,
+      client_id: config.googleClientId,
+      client_secret: config.googleClientSecret,
+      scope: YOUTUBE_SCOPES.join(' '),
+    };
+
     const paramsWithFixes: AuthorizationParams = {
       ...params,
       scopes: YOUTUBE_SCOPES,
@@ -134,13 +134,15 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
       scopes: paramsWithFixes.scopes,
       ourRedirectUri,
       clientRedirectUri,
+      registeredClientId: client.client_id,
+      googleClientId: googleClient.client_id,
     });
 
-    return super.authorize(client, paramsWithFixes, res);
+    return super.authorize(googleClient, paramsWithFixes, res);
   }
 
   /**
-   * Override exchangeAuthorizationCode to use our redirect_uri
+   * Override exchangeAuthorizationCode to use our redirect_uri and Google credentials
    * Must match what we sent to Google in the authorize step
    */
   override async exchangeAuthorizationCode(
@@ -154,16 +156,27 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     const ourRedirectUri = config.googleRedirectUri ||
       `https://ytmusic.dumawtf.com/oauth/callback`;
 
+    // Create a client object with Google's credentials for the upstream exchange
+    // The 'client' parameter has the registered client's credentials (used for validation)
+    // But we need Google's credentials to exchange the code with Google
+    const googleClient: OAuthClientInformationFull = {
+      ...client,
+      client_id: config.googleClientId,
+      client_secret: config.googleClientSecret,
+      scope: YOUTUBE_SCOPES.join(' '),
+    };
+
     logger.info('Exchanging authorization code', {
       redirectUri: ourRedirectUri,
-      clientId: client.client_id,
+      registeredClientId: client.client_id,
+      googleClientId: googleClient.client_id,
       hasCodeVerifier: !!codeVerifier,
       hasResource: !!resource,
     });
 
     try {
       const tokens = await super.exchangeAuthorizationCode(
-        client,
+        googleClient, // Use Google credentials for upstream exchange
         authorizationCode,
         codeVerifier,
         ourRedirectUri, // Use OUR redirect_uri (matches authorize)
