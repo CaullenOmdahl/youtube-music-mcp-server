@@ -115,7 +115,7 @@ export async function createServer(): Promise<Server> {
   app.use(
     mcpAuthRouter({
       provider: oauth,
-      issuerUrl: new URL('https://accounts.google.com'),
+      issuerUrl: baseUrl, // Our server is the OAuth issuer (proxies to Google)
       baseUrl,
       resourceServerUrl, // Tell the router where the protected MCP endpoints are
       serviceDocumentationUrl: new URL('https://github.com/CaullenOmdahl/youtube-music-mcp-server'),
