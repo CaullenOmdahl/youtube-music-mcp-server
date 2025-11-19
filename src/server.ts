@@ -109,11 +109,15 @@ export async function createServer(): Promise<Server> {
     validate: { xForwardedForHeader: false }
   };
 
+  // Resource server URL (where the MCP server is hosted)
+  const resourceServerUrl = new URL('/mcp', baseUrl);
+
   app.use(
     mcpAuthRouter({
       provider: oauth,
       issuerUrl: new URL('https://accounts.google.com'),
       baseUrl,
+      resourceServerUrl, // Tell the router where the protected MCP endpoints are
       serviceDocumentationUrl: new URL('https://github.com/CaullenOmdahl/youtube-music-mcp-server'),
       // Configure rate limiting to work behind reverse proxies
       authorizationOptions: { rateLimit: rateLimitConfig },
@@ -126,9 +130,7 @@ export async function createServer(): Promise<Server> {
   logger.info('OAuth routes mounted for local testing');
 
   // Protected Resource Metadata URL for OAuth 2.0
-  const serverUrl = new URL(baseUrl);
-  serverUrl.pathname = '/mcp';
-  const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(serverUrl);
+  const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(resourceServerUrl);
 
   // Apply bearer auth middleware to MCP endpoints (unless bypassing for testing)
   if (!config.bypassAuth) {
