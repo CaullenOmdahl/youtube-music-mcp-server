@@ -1,8 +1,10 @@
 import { ProxyOAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/providers/proxyProvider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { AuthorizationParams } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
 import type { OAuthProvider } from '@smithery/sdk';
+import type { Response } from 'express';
 import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { randomUUID } from 'crypto';
@@ -77,6 +79,28 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
 
   override get clientsStore(): OAuthRegisteredClientsStore {
     return this._dynamicClientsStore;
+  }
+
+  /**
+   * Override authorize to always include our required YouTube scopes
+   */
+  override async authorize(
+    client: OAuthClientInformationFull,
+    params: AuthorizationParams,
+    res: Response
+  ): Promise<void> {
+    // Ensure our required scopes are always included
+    const paramsWithScopes: AuthorizationParams = {
+      ...params,
+      scopes: YOUTUBE_SCOPES,
+    };
+
+    logger.debug('Authorizing with scopes', {
+      scopes: paramsWithScopes.scopes,
+      clientId: client.client_id,
+    });
+
+    return super.authorize(client, paramsWithScopes, res);
   }
 }
 
