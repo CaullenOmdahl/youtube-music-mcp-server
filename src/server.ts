@@ -129,6 +129,40 @@ export async function createServer(): Promise<Server> {
 
   logger.info('OAuth routes mounted for local testing');
 
+  // OAuth callback handler for Google redirects
+  // When Google redirects back, we need to extract the stored client info and continue the flow
+  app.get('/oauth/callback', async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query;
+
+      if (!code || !state) {
+        res.status(400).send('Missing code or state parameter');
+        return;
+      }
+
+      // Decode the state to get client info
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
+      const { clientId, clientRedirectUri, original: originalState } = stateData;
+
+      // Redirect to the client's callback with the code and original state
+      const redirectUrl = new URL(clientRedirectUri);
+      redirectUrl.searchParams.set('code', code as string);
+      if (originalState) {
+        redirectUrl.searchParams.set('state', originalState);
+      }
+
+      logger.info('OAuth callback - redirecting to client', {
+        clientId,
+        clientRedirectUri,
+      });
+
+      res.redirect(redirectUrl.toString());
+    } catch (error) {
+      logger.error('OAuth callback failed', { error });
+      res.status(500).send('OAuth callback processing failed');
+    }
+  });
+
   // Protected Resource Metadata URL for OAuth 2.0
   const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(resourceServerUrl);
 

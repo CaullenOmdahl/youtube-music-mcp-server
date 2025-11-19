@@ -104,12 +104,12 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     params: AuthorizationParams,
     res: Response
   ): Promise<void> {
-    // Use our authorization endpoint as the redirect_uri
-    // The /authorize endpoint handles both initiating auth AND receiving the callback
+    // Use our callback endpoint as the redirect_uri
+    // Google will redirect here after user authorization
     const ourRedirectUri = config.googleRedirectUri ||
-      `https://ytmusic.dumawtf.com/authorize`;
+      `https://ytmusic.dumawtf.com/oauth/callback`;
 
-    // Store the client's original redirect_uri in state so we can redirect back after
+    // Store the client info in state so we can retrieve it in the callback
     // The state parameter will be echoed back by Google
     const originalState = params.state || '';
     const clientRedirectUri = params.redirectUri;
@@ -118,6 +118,8 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     const stateData = JSON.stringify({
       original: originalState,
       clientRedirectUri,
+      clientId: client.client_id,
+      codeChallenge: params.codeChallenge,
     });
     const encodedState = Buffer.from(stateData).toString('base64url');
 
@@ -150,7 +152,7 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
   ) {
     // Use OUR redirect_uri (must match what we sent to Google)
     const ourRedirectUri = config.googleRedirectUri ||
-      `https://ytmusic.dumawtf.com/authorize`;
+      `https://ytmusic.dumawtf.com/oauth/callback`;
 
     logger.info('Exchanging authorization code', {
       redirectUri: ourRedirectUri,
