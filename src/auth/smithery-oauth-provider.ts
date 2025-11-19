@@ -39,16 +39,30 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
       getClient: (clientId: string) => {
         // Check if this is a dynamically registered client
         const registered = registeredClients.get(clientId);
+
+        logger.debug('Looking up client', {
+          clientId,
+          found: !!registered,
+          registeredCount: registeredClients.size,
+        });
+
         if (registered) {
           // Return client info with OUR Google credentials for proxying
           // but keep the registered client's redirect_uris for validation
-          return {
+          const clientInfo = {
             ...registered,
             // Use our Google OAuth credentials for the actual proxy request
             client_id: config.googleClientId,
             client_secret: config.googleClientSecret,
             scope: YOUTUBE_SCOPES.join(' '),
           };
+
+          logger.debug('Returning client with Google credentials', {
+            originalClientId: clientId,
+            googleClientId: config.googleClientId,
+          });
+
+          return clientInfo;
         }
         return options.getClient(clientId);
       },
@@ -124,17 +138,35 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     const googleRedirectUri = config.googleRedirectUri ||
       'https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback';
 
-    logger.debug('Exchanging authorization code', {
+    logger.info('Exchanging authorization code', {
       redirectUri: googleRedirectUri,
+      clientId: client.client_id,
+      hasCodeVerifier: !!codeVerifier,
+      hasResource: !!resource,
     });
 
-    return super.exchangeAuthorizationCode(
-      client,
-      authorizationCode,
-      codeVerifier,
-      googleRedirectUri,
-      resource
-    );
+    try {
+      const tokens = await super.exchangeAuthorizationCode(
+        client,
+        authorizationCode,
+        codeVerifier,
+        googleRedirectUri,
+        resource
+      );
+
+      logger.info('Token exchange successful', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+      });
+
+      return tokens;
+    } catch (error) {
+      logger.error('Token exchange failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 }
 
