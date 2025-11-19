@@ -65,11 +65,19 @@ function createOAuthProvider(): OAuthProvider {
     },
 
     // Get client configuration
-    getClient: async (clientId: string) => {
+    // Use our Google OAuth client credentials, not the MCP client's ID
+    getClient: async (_clientId: string) => {
       return {
-        client_id: clientId,
+        client_id: config.googleClientId,
         client_secret: config.googleClientSecret,
-        redirect_uris: [config.googleRedirectUri || `http://localhost:${config.port}/oauth/callback`],
+        // Accept common redirect patterns for MCP clients
+        redirect_uris: [
+          'http://localhost:3000/callback',
+          'http://localhost:8080/callback',
+          'http://127.0.0.1:3000/callback',
+          'http://127.0.0.1:8080/callback',
+          config.googleRedirectUri || `http://localhost:${config.port}/oauth/callback`,
+        ],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         scope: YOUTUBE_SCOPES.join(' '),
