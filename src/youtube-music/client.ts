@@ -4,7 +4,6 @@ import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { RateLimiter } from '../utils/rate-limiter.js';
 import { tokenStore } from '../auth/token-store.js';
-import { oauth } from '../auth/smithery-oauth-provider.js';
 import type { Song, Album, Artist, Playlist, SearchResponse } from '../types/index.js';
 import {
   parseSearchResults,
@@ -14,11 +13,6 @@ import {
   parseArtist,
   parseLibrarySongs,
 } from './parsers.js';
-
-// Cast oauth to access refreshAccessToken method
-const oauthProvider = oauth as typeof oauth & {
-  refreshAccessToken: (sessionId: string) => Promise<string>;
-};
 
 const logger = createLogger('youtube-music-client');
 
@@ -118,24 +112,9 @@ export class YouTubeMusicClient {
   ): Promise<T> {
     await this.rateLimiter.acquire();
 
+    // YouTube Music internal API uses cookies, not OAuth bearer tokens
+    // The OAuth tokens are for MCP authentication only
     const headers: Record<string, string> = {};
-
-    // Add authorization header if we have an active session
-    if (!config.bypassAuth && tokenStore.hasActiveSession()) {
-      const sessionId = tokenStore.getCurrentSessionId();
-      if (sessionId) {
-        // Check if token needs refresh
-        if (tokenStore.needsRefresh(sessionId)) {
-          const newToken = await oauthProvider.refreshAccessToken(sessionId);
-          headers['Authorization'] = `Bearer ${newToken}`;
-        } else {
-          const token = tokenStore.getCurrentToken();
-          if (token) {
-            headers['Authorization'] = `Bearer ${token.accessToken}`;
-          }
-        }
-      }
-    }
 
     try {
       const response = await this.client.post<T>(endpoint, {
