@@ -15,10 +15,16 @@ export function registerSystemTools(server: McpServer, context: ServerContext): 
   /**
    * Get authentication status
    */
-  server.tool(
+  server.registerTool(
     'get_auth_status',
-    'Check authentication status and get OAuth URL if not authenticated. After authenticating via the returned URL, the session becomes active automatically.',
-    {},
+    {
+      title: 'Get Auth Status',
+      description: 'Check authentication status and get OAuth URL if not authenticated. After authenticating via the returned URL, the session becomes active automatically.',
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
     async () => {
       logger.debug('get_auth_status called');
 
@@ -82,10 +88,16 @@ export function registerSystemTools(server: McpServer, context: ServerContext): 
   /**
    * Get server status and health metrics
    */
-  server.tool(
+  server.registerTool(
     'get_server_status',
-    'Get server health, version, uptime, and rate limit status.',
-    {},
+    {
+      title: 'Get Server Status',
+      description: 'Get server health, version, uptime, and rate limit status.',
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
     async () => {
       logger.debug('get_server_status called');
 

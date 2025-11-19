@@ -12,12 +12,19 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Search for songs on YouTube Music
    */
-  server.tool(
+  server.registerTool(
     'search_songs',
-    'Search for songs on YouTube Music. Returns structured JSON with song title, album, artist, year, and video ID.',
     {
-      query: z.string().describe('Search query (song name, lyrics, etc.)'),
-      limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      title: 'Search Songs',
+      description: 'Search for songs on YouTube Music. Returns structured JSON with song title, album, artist, year, and video ID.',
+      inputSchema: {
+        query: z.string().describe('Search query (song name, lyrics, etc.)'),
+        limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ query, limit }) => {
       logger.debug('search_songs called', { query, limit });
@@ -57,12 +64,19 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Search for albums on YouTube Music
    */
-  server.tool(
+  server.registerTool(
     'search_albums',
-    'Search for albums on YouTube Music. Returns album name, artist, year, and browse ID.',
     {
-      query: z.string().describe('Search query (album name, artist, etc.)'),
-      limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      title: 'Search Albums',
+      description: 'Search for albums on YouTube Music. Returns album name, artist, year, and browse ID.',
+      inputSchema: {
+        query: z.string().describe('Search query (album name, artist, etc.)'),
+        limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ query, limit }) => {
       logger.debug('search_albums called', { query, limit });
@@ -102,12 +116,19 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Search for artists on YouTube Music
    */
-  server.tool(
+  server.registerTool(
     'search_artists',
-    'Search for artists on YouTube Music. Returns artist name, browse ID, and thumbnails.',
     {
-      query: z.string().describe('Search query (artist name)'),
-      limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      title: 'Search Artists',
+      description: 'Search for artists on YouTube Music. Returns artist name, browse ID, and thumbnails.',
+      inputSchema: {
+        query: z.string().describe('Search query (artist name)'),
+        limit: z.number().min(1).max(50).default(20).describe('Maximum number of results to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ query, limit }) => {
       logger.debug('search_artists called', { query, limit });
@@ -147,11 +168,18 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Get detailed information about a specific song
    */
-  server.tool(
+  server.registerTool(
     'get_song_info',
-    'Get detailed information about a specific song by video ID. Returns title, artist, album, duration, and thumbnails.',
     {
-      video_id: z.string().describe('YouTube Music video ID'),
+      title: 'Get Song Info',
+      description: 'Get detailed information about a specific song by video ID. Returns title, artist, album, duration, and thumbnails.',
+      inputSchema: {
+        video_id: z.string().describe('YouTube Music video ID'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ video_id }) => {
       logger.debug('get_song_info called', { video_id });
@@ -185,11 +213,18 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Get detailed information about an album including all tracks
    */
-  server.tool(
+  server.registerTool(
     'get_album_info',
-    'Get detailed album information including all tracks, year, and artist. Use browse_id from search results.',
     {
-      browse_id: z.string().describe('Album browse ID from search results'),
+      title: 'Get Album Info',
+      description: 'Get detailed album information including all tracks, year, and artist. Use browse_id from search results.',
+      inputSchema: {
+        browse_id: z.string().describe('Album browse ID from search results'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ browse_id }) => {
       logger.debug('get_album_info called', { browse_id });
@@ -223,11 +258,18 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Get detailed information about an artist including top songs
    */
-  server.tool(
+  server.registerTool(
     'get_artist_info',
-    'Get detailed artist information including top songs. Use browse_id from search results.',
     {
-      browse_id: z.string().describe('Artist browse ID (channel ID) from search results'),
+      title: 'Get Artist Info',
+      description: 'Get detailed artist information including top songs. Use browse_id from search results.',
+      inputSchema: {
+        browse_id: z.string().describe('Artist browse ID (channel ID) from search results'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ browse_id }) => {
       logger.debug('get_artist_info called', { browse_id });
@@ -261,11 +303,18 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
   /**
    * Get user's liked songs from library
    */
-  server.tool(
+  server.registerTool(
     'get_library_songs',
-    'Get the user\'s liked songs from their YouTube Music library. Returns structured JSON with song details.',
     {
-      limit: z.number().min(1).max(500).default(100).describe('Maximum number of songs to return'),
+      title: 'Get Library Songs',
+      description: 'Get the user\'s liked songs from their YouTube Music library. Returns structured JSON with song details.',
+      inputSchema: {
+        limit: z.number().min(1).max(500).default(100).describe('Maximum number of songs to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ limit }) => {
       logger.debug('get_library_songs called', { limit });
