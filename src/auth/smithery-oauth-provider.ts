@@ -35,10 +35,18 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     // Create a clients store that supports dynamic registration
     this._dynamicClientsStore = {
       getClient: (clientId: string) => {
-        // First check registered clients, then fall back to the base getClient
+        // Check if this is a dynamically registered client
         const registered = registeredClients.get(clientId);
         if (registered) {
-          return registered;
+          // Return client info with OUR Google credentials for proxying
+          // but keep the registered client's redirect_uris for validation
+          return {
+            ...registered,
+            // Use our Google OAuth credentials for the actual proxy request
+            client_id: config.googleClientId,
+            client_secret: config.googleClientSecret,
+            scope: YOUTUBE_SCOPES.join(' '),
+          };
         }
         return options.getClient(clientId);
       },
