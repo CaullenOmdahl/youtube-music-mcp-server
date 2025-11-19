@@ -1,86 +1,31 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
+# Dependencies
+node_modules/
+
+# Build output
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# OAuth and secrets
-client_secret*.json
-.credentials/
-credentials.json
-token.json
-headers_auth.json
-oauth_session.json
 
 # Environment files
+.env
 .env.local
-.env.development
-.env.test
-.env.production
+.env.*.local
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
-logs/
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+npm-debug.log*
 
 # Test coverage
-.coverage
-htmlcov/
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+coverage/
 
 # Temporary files
-*.tmp
-*.temp
-.tmp/
-.temp/
-*.log
+tmp/
+temp/

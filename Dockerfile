@@ -1,57 +1,41 @@
-FROM python:3.12-slim
+FROM node:20-alpine AS builder
 
-# Security: Create non-root user
-RUN groupadd -r ytmusic && useradd -r -g ytmusic ytmusic
-
-# Install system dependencies (both build and runtime)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    libffi-dev \
-    libssl-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set up application directory
 WORKDIR /app
 
-# Copy project files
-COPY pyproject.toml README.md ./
-COPY ytmusic_server ./ytmusic_server
+# Copy package files
+COPY package*.json ./
 
-# Install dependencies with cache for faster builds
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install .
+# Install dependencies
+RUN npm ci
 
-# Clean up build dependencies to reduce image size
-RUN apt-get purge -y \
-    gcc \
-    g++ \
-    libffi-dev \
-    libssl-dev \
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Copy source code
+COPY . .
 
-# Security: Set ownership and permissions
-RUN chown -R ytmusic:ytmusic /app && \
-    chmod -R 755 /app
+# Build TypeScript
+RUN npm run build
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8081}/health || exit 1
+# Production stage
+FROM node:20-alpine
 
-# Security: Run as non-root user
-USER ytmusic
+WORKDIR /app
 
-# Environment variables
-ENV PYTHONPATH=/app \
-    PORT=8081 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+# Copy package files and install production dependencies only
+COPY package*.json ./
+RUN npm ci --production
+
+# Copy built files
+COPY --from=builder /app/dist ./dist
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8081
 
 # Expose port
 EXPOSE 8081
 
-# Run the application
-CMD ["python", "-m", "ytmusic_server.server"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
+
+# Run the server
+CMD ["node", "dist/index.js"]
