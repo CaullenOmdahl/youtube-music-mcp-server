@@ -37,7 +37,12 @@ function createOAuthProvider(): OAuthProvider {
         );
 
         if (!response.ok) {
-          throw new Error('Invalid token');
+          const errorText = await response.text();
+          logger.error('Google tokeninfo failed', {
+            status: response.status,
+            error: errorText
+          });
+          throw new Error(`Token validation failed: ${response.status}`);
         }
 
         const tokenInfo = (await response.json()) as {
@@ -47,9 +52,21 @@ function createOAuthProvider(): OAuthProvider {
           email?: string;
         };
 
+        // Log token info for debugging (not the actual token)
+        logger.debug('Token info received', {
+          aud: tokenInfo.aud,
+          expectedClientId: config.googleClientId,
+          scope: tokenInfo.scope,
+          expiresIn: tokenInfo.expires_in,
+        });
+
         // Verify the token is for our client
         if (tokenInfo.aud !== config.googleClientId) {
-          throw new Error('Token audience mismatch');
+          logger.error('Token audience mismatch', {
+            tokenAud: tokenInfo.aud,
+            expectedClientId: config.googleClientId,
+          });
+          throw new Error(`Token audience mismatch: got ${tokenInfo.aud}, expected ${config.googleClientId}`);
         }
 
         return {
@@ -59,8 +76,9 @@ function createOAuthProvider(): OAuthProvider {
           expiresAt: Date.now() + parseInt(tokenInfo.expires_in) * 1000,
         };
       } catch (error) {
-        logger.error('Token verification failed', { error });
-        throw new Error('Invalid or expired token');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Token verification failed', { error: errorMessage });
+        throw new Error(`Authentication failed - ${errorMessage}`);
       }
     },
 
