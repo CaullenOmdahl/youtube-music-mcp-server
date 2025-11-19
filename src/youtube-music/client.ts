@@ -104,6 +104,37 @@ export class YouTubeMusicClient {
   }
 
   /**
+   * Initialize YouTube Music session using OAuth access token
+   * This exchanges the OAuth token for YouTube Music session cookies
+   */
+  private async initializeSession(): Promise<void> {
+    const token = tokenStore.getCurrentToken();
+    if (!token) {
+      logger.debug('No OAuth token available for session initialization');
+      return;
+    }
+
+    try {
+      // Make an authenticated request to YouTube Music to establish session
+      // This will set the necessary cookies in our CookieJar
+      await got.get(YTM_BASE_URL, {
+        cookieJar: this.cookieJar,
+        headers: {
+          'Authorization': `Bearer ${token.accessToken}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        followRedirect: true,
+      });
+
+      logger.info('YouTube Music session initialized with OAuth token');
+    } catch (error) {
+      logger.warn('Failed to initialize YouTube Music session', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
    * Make authenticated API request
    */
   private async makeRequest<T>(
@@ -112,8 +143,14 @@ export class YouTubeMusicClient {
   ): Promise<T> {
     await this.rateLimiter.acquire();
 
-    // YouTube Music internal API uses cookies, not OAuth bearer tokens
-    // The OAuth tokens are for MCP authentication only
+    // Initialize session with OAuth token if we have one but no cookies yet
+    if (tokenStore.hasActiveSession()) {
+      const cookies = await this.cookieJar.getCookies(YTM_BASE_URL);
+      if (cookies.length === 0) {
+        await this.initializeSession();
+      }
+    }
+
     const headers: Record<string, string> = {};
 
     try {
