@@ -19,6 +19,7 @@ import { ListenBrainzClient } from './listenbrainz/client.js';
 import { RecommendationEngine } from './recommendations/engine.js';
 import { SessionManager } from './recommendations/session.js';
 import { oauth } from './auth/smithery-oauth-provider.js';
+import { tokenStore } from './auth/token-store.js';
 
 const logger = createLogger('server');
 
@@ -174,6 +175,28 @@ export async function createServer(): Promise<Server> {
       resourceMetadataUrl,
     }));
     logger.info('Bearer auth required for MCP endpoints');
+
+    // Extract and store authenticated token for YouTube Music API calls
+    app.use('/mcp', (req: Request, _res: Response, next) => {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        // Store token with MCP session ID
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+        if (sessionId) {
+          // Note: We don't have refresh token or expiry from the bearer token itself
+          // The OAuth provider handles token refresh
+          tokenStore.setToken(sessionId, {
+            accessToken: token,
+            refreshToken: '', // Not available from bearer auth
+            expiresAt: Date.now() + 3600000, // Assume 1 hour
+          });
+          tokenStore.setCurrentSession(sessionId);
+          logger.debug('Token stored for YouTube Music API calls', { sessionId });
+        }
+      }
+      next();
+    });
   } else {
     logger.warn('BYPASS_AUTH enabled - MCP endpoints unprotected!');
   }
