@@ -96,48 +96,64 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
   }
 
   /**
-   * Override authorize to use our registered redirect_uri and scopes
+   * Override authorize to use our registered redirect_uri with Google
+   * We use OUR callback URL with Google, then redirect back to the client
    */
   override async authorize(
     client: OAuthClientInformationFull,
     params: AuthorizationParams,
     res: Response
   ): Promise<void> {
-    // Important: redirect_uri must match what's registered in Google Cloud Console
-    // For Smithery: use the client's redirect_uri (Smithery handles the callback)
-    // The client's redirect_uri will be something like https://smithery.ai/chat/callback
+    // Use our registered redirect_uri for Google
+    // Google only accepts URIs registered in Cloud Console
+    const ourRedirectUri = config.googleRedirectUri ||
+      `https://ytmusic.dumawtf.com/oauth/callback`;
+
+    // Store the client's original redirect_uri in state so we can redirect back after
+    // The state parameter will be echoed back by Google
+    const originalState = params.state || '';
+    const clientRedirectUri = params.redirectUri;
+
+    // Encode client info in state (we'll decode it in the callback)
+    const stateData = JSON.stringify({
+      original: originalState,
+      clientRedirectUri,
+    });
+    const encodedState = Buffer.from(stateData).toString('base64url');
 
     const paramsWithFixes: AuthorizationParams = {
       ...params,
       scopes: YOUTUBE_SCOPES,
-      // Use client's redirect_uri - Smithery infrastructure handles callbacks
+      redirectUri: ourRedirectUri, // Use OUR registered callback
+      state: encodedState, // Store client's redirect_uri in state
     };
 
     logger.debug('Authorizing with Google', {
       scopes: paramsWithFixes.scopes,
-      redirectUri: paramsWithFixes.redirectUri,
-      originalRedirectUri: params.redirectUri,
+      ourRedirectUri,
+      clientRedirectUri,
     });
 
     return super.authorize(client, paramsWithFixes, res);
   }
 
   /**
-   * Override exchangeAuthorizationCode to pass through the client's redirect_uri
-   * Google requires the redirect_uri to match the one used in authorize
+   * Override exchangeAuthorizationCode to use our redirect_uri
+   * Must match what we sent to Google in the authorize step
    */
   override async exchangeAuthorizationCode(
     client: OAuthClientInformationFull,
     authorizationCode: string,
     codeVerifier?: string,
-    redirectUri?: string,
+    _redirectUri?: string,
     resource?: URL
   ) {
-    // Use the redirectUri that was passed in (from the client)
-    // This must match what was sent to Google in the authorize step
+    // Use OUR redirect_uri (must match what we sent to Google)
+    const ourRedirectUri = config.googleRedirectUri ||
+      `https://ytmusic.dumawtf.com/oauth/callback`;
 
     logger.info('Exchanging authorization code', {
-      redirectUri,
+      redirectUri: ourRedirectUri,
       clientId: client.client_id,
       hasCodeVerifier: !!codeVerifier,
       hasResource: !!resource,
@@ -148,7 +164,7 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
         client,
         authorizationCode,
         codeVerifier,
-        redirectUri, // Pass through the client's redirect_uri
+        ourRedirectUri, // Use OUR redirect_uri (matches authorize)
         resource
       );
 
