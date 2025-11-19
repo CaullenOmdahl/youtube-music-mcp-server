@@ -70,6 +70,10 @@ export async function createServer(): Promise<Server> {
 
   // Create Express app for HTTP endpoints
   const app: Express = express();
+
+  // Trust proxy for proper IP detection behind reverse proxies (ngrok, Smithery, etc.)
+  app.set('trust proxy', 1);
+
   app.use(express.json());
 
   // Health check endpoint
