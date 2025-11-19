@@ -30,13 +30,15 @@ const YOUTUBE_SCOPES = [
 // Store for registered clients
 const registeredClients = new Map<string, OAuthClientInformationFull>();
 
-// Store for pending authorizations (code -> { codeChallenge, clientRedirectUri, state })
+// Store for pending authorizations
+// Maps our authCode -> { codeChallenge, clientRedirectUri, state, googleCode }
 const pendingAuthorizations = new Map<
   string,
   {
     codeChallenge: string;
     clientRedirectUri: string;
     state?: string;
+    googleCode?: string; // Google's auth code, stored after callback
   }
 >();
 
@@ -78,10 +80,18 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
 
   private _clientsStore = new ClientStore();
 
-  // Skip local PKCE validation since Google handles it
+  // Let Smithery handle PKCE validation - we'll pass code_verifier to Google
   skipLocalPkceValidation = true;
 
   constructor() {
+    if (!config.googleClientId || !config.googleClientSecret || !config.googleRedirectUri) {
+      logger.error('Missing required Google OAuth configuration', {
+        hasClientId: !!config.googleClientId,
+        hasClientSecret: !!config.googleClientSecret,
+        hasRedirectUri: !!config.googleRedirectUri,
+      });
+    }
+
     logger.info('Google OAuth provider initialized', {
       redirectUri: config.googleRedirectUri,
     });
@@ -102,6 +112,10 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
     params: AuthorizationParams,
     res: Response
   ): Promise<void> {
+    if (!config.googleRedirectUri) {
+      throw new Error('GOOGLE_REDIRECT_URI not configured');
+    }
+
     // Generate an authorization code to track this request
     const authCode = randomUUID();
 
@@ -122,7 +136,7 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
     // Construct Google OAuth URL with Smithery's callback
     const authUrl = new URL(GOOGLE_AUTH_URL);
     authUrl.searchParams.set('client_id', config.googleClientId);
-    authUrl.searchParams.set('redirect_uri', config.googleRedirectUri ?? '');
+    authUrl.searchParams.set('redirect_uri', config.googleRedirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', YOUTUBE_SCOPES.join(' '));
     authUrl.searchParams.set('state', encodedState);
@@ -136,6 +150,7 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
     logger.info('Redirecting to Google OAuth', {
       clientId: client.client_id,
       scopes: YOUTUBE_SCOPES,
+      authCode,
     });
 
     // Redirect to Google
@@ -144,12 +159,12 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
 
   /**
    * Handle the OAuth callback from Google
-   * This is called by Smithery when it receives the callback
+   * Store Google's code but don't exchange it yet - wait for code_verifier
    */
   async handleOAuthCallback(
     code: string,
     state: string | undefined,
-    res: Response
+    _res: Response
   ): Promise<URL> {
     try {
       // Decode state to get our auth code
@@ -174,38 +189,21 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
         throw new Error('Unknown authorization');
       }
 
-      // Exchange code for tokens with Google
-      const { tokens } = await this.oauth2Client.getToken(code);
+      // Store Google's code for later exchange (when we have code_verifier)
+      pending.googleCode = code;
+      pendingAuthorizations.set(authCode, pending);
 
-      if (!tokens.access_token) {
-        throw new Error('No access token received');
-      }
-
-      logger.info('Successfully exchanged code for tokens', {
-        hasAccessToken: !!tokens.access_token,
-        hasRefreshToken: !!tokens.refresh_token,
-      });
-
-      // Store tokens
-      if (tokens.refresh_token) {
-        tokenStore.setToken(authCode, {
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          expiresAt: tokens.expiry_date ?? Date.now() + 3600000,
-        });
-      }
-
-      // Build redirect URL back to client with the auth code
+      // Build redirect URL back to client with our auth code
       const redirectUrl = new URL(pending.clientRedirectUri);
       redirectUrl.searchParams.set('code', authCode);
       if (originalState) {
         redirectUrl.searchParams.set('state', originalState);
       }
 
-      // Clean up
-      pendingAuthorizations.delete(authCode);
-
-      logger.info('OAuth callback successful, redirecting to client');
+      logger.info('OAuth callback successful, redirecting to client', {
+        authCode,
+        hasGoogleCode: !!code,
+      });
 
       return redirectUrl;
     } catch (error) {
@@ -223,12 +221,6 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
   ): Promise<string> {
     const pending = pendingAuthorizations.get(authorizationCode);
     if (!pending) {
-      // Check if we have stored tokens (callback already processed)
-      const stored = tokenStore.getToken(authorizationCode);
-      if (stored) {
-        // Return empty string since we've already validated with Google
-        return '';
-      }
       throw new Error('Unknown authorization code');
     }
     return pending.codeChallenge;
@@ -236,29 +228,63 @@ class GoogleOAuthProvider implements OAuthServerProvider, OAuthProvider {
 
   /**
    * Exchange authorization code for tokens
+   * This is called with the code_verifier, so now we can exchange with Google
    */
   async exchangeAuthorizationCode(
     _client: OAuthClientInformationFull,
     authorizationCode: string,
-    _codeVerifier?: string,
+    codeVerifier?: string,
     _redirectUri?: string,
     _resource?: URL
   ): Promise<OAuthTokens> {
-    // Get stored tokens from the callback
-    const stored = tokenStore.getToken(authorizationCode);
-    if (!stored) {
+    const pending = pendingAuthorizations.get(authorizationCode);
+    if (!pending || !pending.googleCode) {
       throw new Error('Invalid or expired authorization code');
     }
 
-    logger.info('Exchanging authorization code for tokens');
+    try {
+      // Now exchange Google's code for tokens with the code_verifier
+      const { tokens } = await this.oauth2Client.getToken({
+        code: pending.googleCode,
+        codeVerifier: codeVerifier,
+      });
 
-    return {
-      access_token: stored.accessToken,
-      token_type: 'Bearer',
-      expires_in: Math.floor((stored.expiresAt - Date.now()) / 1000),
-      refresh_token: stored.refreshToken,
-      scope: YOUTUBE_SCOPES.join(' '),
-    };
+      if (!tokens.access_token) {
+        throw new Error('No access token received from Google');
+      }
+
+      logger.info('Successfully exchanged code for tokens', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+      });
+
+      // Store tokens for later use by the YouTube Music client
+      if (tokens.refresh_token) {
+        tokenStore.setToken(authorizationCode, {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: tokens.expiry_date ?? Date.now() + 3600000,
+        });
+      }
+
+      // Clean up pending authorization
+      pendingAuthorizations.delete(authorizationCode);
+
+      return {
+        access_token: tokens.access_token,
+        token_type: 'Bearer',
+        expires_in: tokens.expiry_date
+          ? Math.floor((tokens.expiry_date - Date.now()) / 1000)
+          : 3600,
+        refresh_token: tokens.refresh_token ?? undefined,
+        scope: YOUTUBE_SCOPES.join(' '),
+      };
+    } catch (error) {
+      logger.error('Failed to exchange code for tokens', { error, authorizationCode });
+      // Clean up on error
+      pendingAuthorizations.delete(authorizationCode);
+      throw error;
+    }
   }
 
   /**
