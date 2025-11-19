@@ -87,11 +87,26 @@ export async function createServer(): Promise<Server> {
 
   // Mount OAuth routes using MCP SDK's mcpAuthRouter for local testing
   // In production, Smithery handles these automatically
+
+  // Derive base URL from redirect URI by removing /oauth/callback path
+  // mcpAuthRouter expects the server's base URL, not the full callback URL
+  let baseUrl: URL;
+  if (config.googleRedirectUri) {
+    const redirectUrl = new URL(config.googleRedirectUri);
+    // Remove /oauth/callback to get the base server URL
+    const basePath = redirectUrl.pathname.replace(/\/oauth\/callback$/, '');
+    baseUrl = new URL(basePath || '/', redirectUrl.origin);
+  } else {
+    baseUrl = new URL(`http://localhost:${config.port}`);
+  }
+
+  logger.info('OAuth router base URL', { baseUrl: baseUrl.toString() });
+
   app.use(
     mcpAuthRouter({
       provider: oauth,
       issuerUrl: new URL('https://accounts.google.com'),
-      baseUrl: new URL(config.googleRedirectUri || `http://localhost:${config.port}`),
+      baseUrl,
       serviceDocumentationUrl: new URL('https://github.com/CaullenOmdahl/youtube-music-mcp-server'),
     })
   );
