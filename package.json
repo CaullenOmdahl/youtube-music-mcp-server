@@ -3,6 +3,7 @@
   "version": "3.0.0",
   "description": "Enterprise-grade MCP server for YouTube Music with smart playlist creation",
   "main": "dist/index.js",
+  "module": "./src/index.ts",
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
