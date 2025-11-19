@@ -108,6 +108,34 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
 
     return super.authorize(client, paramsWithFixes, res);
   }
+
+  /**
+   * Override exchangeAuthorizationCode to use our registered redirect_uri
+   * Google requires the redirect_uri to match the one used in authorize
+   */
+  override async exchangeAuthorizationCode(
+    client: OAuthClientInformationFull,
+    authorizationCode: string,
+    codeVerifier?: string,
+    _redirectUri?: string,
+    resource?: URL
+  ) {
+    // Use our registered redirect_uri, not the one from the callback
+    const googleRedirectUri = config.googleRedirectUri ||
+      'https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback';
+
+    logger.debug('Exchanging authorization code', {
+      redirectUri: googleRedirectUri,
+    });
+
+    return super.exchangeAuthorizationCode(
+      client,
+      authorizationCode,
+      codeVerifier,
+      googleRedirectUri,
+      resource
+    );
+  }
 }
 
 /**
