@@ -12,13 +12,20 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Start a smart playlist session
    */
-  server.tool(
+  server.registerTool(
     'start_smart_playlist',
-    'Start an interactive smart playlist creation session. Returns session ID to use with other smart playlist tools.',
     {
-      mode: z.enum(['discover', 'from_library', 'mixed']).default('discover').describe(
-        'discover: Find new music based on seeds. from_library: Build from liked songs. mixed: Combine both.'
-      ),
+      title: 'Start Smart Playlist',
+      description: 'Start an interactive smart playlist creation session. Returns session ID to use with other smart playlist tools.',
+      inputSchema: {
+        mode: z.enum(['discover', 'from_library', 'mixed']).default('discover').describe(
+          'discover: Find new music based on seeds. from_library: Build from liked songs. mixed: Combine both.'
+        ),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
     },
     async ({ mode }) => {
       logger.debug('start_smart_playlist called', { mode });
@@ -62,12 +69,20 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Add seed artist to session
    */
-  server.tool(
+  server.registerTool(
     'add_seed_artist',
-    'Add an artist to influence smart playlist recommendations. Looks up artist in MusicBrainz and retrieves tags.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
-      artist_name: z.string().describe('Artist name to add as seed'),
+      title: 'Add Seed Artist',
+      description: 'Add an artist to influence smart playlist recommendations. Looks up artist in MusicBrainz and retrieves tags.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+        artist_name: z.string().describe('Artist name to add as seed'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ session_id, artist_name }) => {
       logger.debug('add_seed_artist called', { session_id, artist_name });
@@ -145,13 +160,21 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Add seed track to session
    */
-  server.tool(
+  server.registerTool(
     'add_seed_track',
-    'Add a specific track as a seed for smart playlist recommendations.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
-      track_name: z.string().describe('Track title'),
-      artist_name: z.string().describe('Artist name'),
+      title: 'Add Seed Track',
+      description: 'Add a specific track as a seed for smart playlist recommendations.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+        track_name: z.string().describe('Track title'),
+        artist_name: z.string().describe('Artist name'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ session_id, track_name, artist_name }) => {
       logger.debug('add_seed_track called', { session_id, track_name, artist_name });
@@ -228,17 +251,25 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Refine recommendation parameters
    */
-  server.tool(
+  server.registerTool(
     'refine_recommendations',
-    'Adjust recommendation parameters: exclude artists, prefer/avoid tags, set diversity level.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
-      exclude_artists: z.array(z.string()).optional().describe('Artists to exclude from recommendations'),
-      prefer_tags: z.array(z.string()).optional().describe('Tags to prefer (e.g., "electronic", "ambient")'),
-      avoid_tags: z.array(z.string()).optional().describe('Tags to avoid (e.g., "metal", "country")'),
-      diversity: z.enum(['focused', 'balanced', 'diverse']).optional().describe(
-        'focused: Very similar to seeds. balanced: Mix of similar and new. diverse: Exploratory.'
-      ),
+      title: 'Refine Recommendations',
+      description: 'Adjust recommendation parameters: exclude artists, prefer/avoid tags, set diversity level.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+        exclude_artists: z.array(z.string()).optional().describe('Artists to exclude from recommendations'),
+        prefer_tags: z.array(z.string()).optional().describe('Tags to prefer (e.g., "electronic", "ambient")'),
+        avoid_tags: z.array(z.string()).optional().describe('Tags to avoid (e.g., "metal", "country")'),
+        diversity: z.enum(['focused', 'balanced', 'diverse']).optional().describe(
+          'focused: Very similar to seeds. balanced: Mix of similar and new. diverse: Exploratory.'
+        ),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
     },
     async ({ session_id, exclude_artists, prefer_tags, avoid_tags, diversity }) => {
       logger.debug('refine_recommendations called', {
@@ -306,12 +337,19 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Generate recommendations
    */
-  server.tool(
+  server.registerTool(
     'get_recommendations',
-    'Generate playlist recommendations based on seeds and refinement settings. Searches YouTube Music for tracks.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
-      limit: z.number().min(1).max(100).default(50).describe('Maximum number of recommendations'),
+      title: 'Get Recommendations',
+      description: 'Generate playlist recommendations based on seeds and refinement settings. Searches YouTube Music for tracks.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+        limit: z.number().min(1).max(100).default(50).describe('Maximum number of recommendations'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ session_id, limit }) => {
       logger.debug('get_recommendations called', { session_id, limit });
@@ -401,11 +439,17 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Preview playlist before creation
    */
-  server.tool(
+  server.registerTool(
     'preview_playlist',
-    'Preview the smart playlist before creating it. Shows all tracks and session details.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
+      title: 'Preview Playlist',
+      description: 'Preview the smart playlist before creating it. Shows all tracks and session details.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
     },
     async ({ session_id }) => {
       logger.debug('preview_playlist called', { session_id });
@@ -470,14 +514,22 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Create the smart playlist on YouTube Music
    */
-  server.tool(
+  server.registerTool(
     'create_smart_playlist',
-    'Create the smart playlist on YouTube Music with all recommended tracks.',
     {
-      session_id: z.string().describe('Smart playlist session ID'),
-      name: z.string().describe('Playlist name'),
-      description: z.string().optional().describe('Playlist description'),
-      privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).default('PRIVATE').describe('Privacy status'),
+      title: 'Create Smart Playlist',
+      description: 'Create the smart playlist on YouTube Music with all recommended tracks.',
+      inputSchema: {
+        session_id: z.string().describe('Smart playlist session ID'),
+        name: z.string().describe('Playlist name'),
+        description: z.string().optional().describe('Playlist description'),
+        privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).default('PRIVATE').describe('Privacy status'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ session_id, name, description, privacy }) => {
       logger.debug('create_smart_playlist called', { session_id, name, privacy });
@@ -561,11 +613,18 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
   /**
    * Get user taste profile
    */
-  server.tool(
+  server.registerTool(
     'get_user_taste_profile',
-    'Analyze user\'s liked songs to build a taste profile with top tags, artists, and genres.',
     {
-      limit: z.number().min(10).max(500).default(100).describe('Number of liked songs to analyze'),
+      title: 'Get User Taste Profile',
+      description: 'Analyze user\'s liked songs to build a taste profile with top tags, artists, and genres.',
+      inputSchema: {
+        limit: z.number().min(10).max(500).default(100).describe('Number of liked songs to analyze'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ limit }) => {
       logger.debug('get_user_taste_profile called', { limit });

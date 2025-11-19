@@ -2,41 +2,18 @@ name: youtube-music-mcp-server
 version: 3.0.0
 description: Enterprise-grade MCP server for YouTube Music with smart playlist creation using MusicBrainz and ListenBrainz
 
+runtime: "container"
+
 build:
   dockerfile: Dockerfile
+  dockerBuildPath: "."
 
 startCommand:
-  type: http
+  type: "http"
   configSchema:
-    type: object
-    properties:
-      GOOGLE_OAUTH_CLIENT_ID:
-        type: string
-        description: Google OAuth 2.0 Client ID
-      GOOGLE_OAUTH_CLIENT_SECRET:
-        type: string
-        description: Google OAuth 2.0 Client Secret
-      GOOGLE_REDIRECT_URI:
-        type: string
-        description: OAuth redirect URI
-      ENCRYPTION_KEY:
-        type: string
-        description: Base64-encoded 32-byte encryption key
-    required:
-      - GOOGLE_OAUTH_CLIENT_ID
-      - GOOGLE_OAUTH_CLIENT_SECRET
-      - GOOGLE_REDIRECT_URI
-      - ENCRYPTION_KEY
-  commandFunction: |
-    (config) => ({
-      command: 'node',
-      args: ['dist/index.js'],
-      env: {
-        GOOGLE_OAUTH_CLIENT_ID: config.GOOGLE_OAUTH_CLIENT_ID,
-        GOOGLE_OAUTH_CLIENT_SECRET: config.GOOGLE_OAUTH_CLIENT_SECRET,
-        GOOGLE_REDIRECT_URI: config.GOOGLE_REDIRECT_URI,
-        ENCRYPTION_KEY: config.ENCRYPTION_KEY,
-        PORT: '8081',
-        NODE_ENV: 'production'
-      }
-    })
+    type: "object"
+    properties: {}
+
+env:
+  PORT: "8081"
+  NODE_ENV: "production"

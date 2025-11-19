@@ -12,11 +12,18 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Get user's playlists
    */
-  server.tool(
+  server.registerTool(
     'get_playlists',
-    'Get the user\'s playlists from YouTube Music library. Returns playlist name, ID, and track count as structured JSON.',
     {
-      limit: z.number().min(1).max(100).default(25).describe('Maximum number of playlists to return'),
+      title: 'Get Playlists',
+      description: 'Get the user\'s playlists from YouTube Music library. Returns playlist name, ID, and track count as structured JSON.',
+      inputSchema: {
+        limit: z.number().min(1).max(100).default(25).describe('Maximum number of playlists to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ limit }) => {
       logger.debug('get_playlists called', { limit });
@@ -56,12 +63,19 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Get playlist details with tracks
    */
-  server.tool(
+  server.registerTool(
     'get_playlist_details',
-    'Get detailed playlist information including all tracks with song, album, artist, and duration.',
     {
-      playlist_id: z.string().describe('Playlist ID'),
-      limit: z.number().min(1).max(500).default(100).describe('Maximum number of tracks to return'),
+      title: 'Get Playlist Details',
+      description: 'Get detailed playlist information including all tracks with song, album, artist, and duration.',
+      inputSchema: {
+        playlist_id: z.string().describe('Playlist ID'),
+        limit: z.number().min(1).max(500).default(100).describe('Maximum number of tracks to return'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ playlist_id, limit }) => {
       logger.debug('get_playlist_details called', { playlist_id, limit });
@@ -101,13 +115,21 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Create a new playlist
    */
-  server.tool(
+  server.registerTool(
     'create_playlist',
-    'Create a new YouTube Music playlist. Returns the new playlist ID.',
     {
-      name: z.string().min(1).describe('Playlist name'),
-      description: z.string().optional().describe('Playlist description'),
-      privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).default('PRIVATE').describe('Privacy status'),
+      title: 'Create Playlist',
+      description: 'Create a new YouTube Music playlist. Returns the new playlist ID.',
+      inputSchema: {
+        name: z.string().min(1).describe('Playlist name'),
+        description: z.string().optional().describe('Playlist description'),
+        privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).default('PRIVATE').describe('Privacy status'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ name, description, privacy }) => {
       logger.debug('create_playlist called', { name, privacy });
@@ -149,14 +171,23 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Edit playlist metadata
    */
-  server.tool(
+  server.registerTool(
     'edit_playlist',
-    'Edit playlist metadata (name, description, privacy). Only provide fields you want to change.',
     {
-      playlist_id: z.string().describe('Playlist ID to edit'),
-      name: z.string().optional().describe('New playlist name'),
-      description: z.string().optional().describe('New playlist description'),
-      privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).optional().describe('New privacy status'),
+      title: 'Edit Playlist',
+      description: 'Edit playlist metadata (name, description, privacy). Only provide fields you want to change.',
+      inputSchema: {
+        playlist_id: z.string().describe('Playlist ID to edit'),
+        name: z.string().optional().describe('New playlist name'),
+        description: z.string().optional().describe('New playlist description'),
+        privacy: z.enum(['PRIVATE', 'PUBLIC', 'UNLISTED']).optional().describe('New privacy status'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ playlist_id, name, description, privacy }) => {
       logger.debug('edit_playlist called', { playlist_id, name, privacy });
@@ -198,11 +229,19 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Delete a playlist
    */
-  server.tool(
+  server.registerTool(
     'delete_playlist',
-    'Delete a playlist from YouTube Music. This action cannot be undone.',
     {
-      playlist_id: z.string().describe('Playlist ID to delete'),
+      title: 'Delete Playlist',
+      description: 'Delete a playlist from YouTube Music. This action cannot be undone.',
+      inputSchema: {
+        playlist_id: z.string().describe('Playlist ID to delete'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ playlist_id }) => {
       logger.debug('delete_playlist called', { playlist_id });
@@ -239,12 +278,20 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Add songs to playlist (batch operation)
    */
-  server.tool(
+  server.registerTool(
     'add_songs_to_playlist',
-    'Add one or more songs to an existing playlist. Supports batch operations for efficiency.',
     {
-      playlist_id: z.string().describe('Target playlist ID'),
-      video_ids: z.array(z.string()).min(1).describe('Array of video IDs to add'),
+      title: 'Add Songs to Playlist',
+      description: 'Add one or more songs to an existing playlist. Supports batch operations for efficiency.',
+      inputSchema: {
+        playlist_id: z.string().describe('Target playlist ID'),
+        video_ids: z.array(z.string()).min(1).describe('Array of video IDs to add'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ playlist_id, video_ids }) => {
       logger.debug('add_songs_to_playlist called', {
@@ -286,12 +333,20 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   /**
    * Remove songs from playlist (batch operation)
    */
-  server.tool(
+  server.registerTool(
     'remove_songs_from_playlist',
-    'Remove one or more songs from a playlist. Requires setVideoId (not videoId) from playlist track data.',
     {
-      playlist_id: z.string().describe('Playlist ID'),
-      set_video_ids: z.array(z.string()).min(1).describe('Array of setVideoIds from playlist tracks to remove'),
+      title: 'Remove Songs from Playlist',
+      description: 'Remove one or more songs from a playlist. Requires setVideoId (not videoId) from playlist track data.',
+      inputSchema: {
+        playlist_id: z.string().describe('Playlist ID'),
+        set_video_ids: z.array(z.string()).min(1).describe('Array of setVideoIds from playlist tracks to remove'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ playlist_id, set_video_ids }) => {
       logger.debug('remove_songs_from_playlist called', {
