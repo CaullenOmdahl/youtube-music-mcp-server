@@ -2,6 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
+import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import express, { Express, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -123,6 +125,23 @@ export async function createServer(): Promise<Server> {
 
   logger.info('OAuth routes mounted for local testing');
 
+  // Protected Resource Metadata URL for OAuth 2.0
+  const serverUrl = new URL(baseUrl);
+  serverUrl.pathname = '/mcp';
+  const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(serverUrl);
+
+  // Apply bearer auth middleware to MCP endpoints (unless bypassing for testing)
+  if (!config.bypassAuth) {
+    app.use('/mcp', requireBearerAuth({
+      verifier: oauth,
+      requiredScopes: [],
+      resourceMetadataUrl,
+    }));
+    logger.info('Bearer auth required for MCP endpoints');
+  } else {
+    logger.warn('BYPASS_AUTH enabled - MCP endpoints unprotected!');
+  }
+
   // Store transports for session management
   const transports: {
     streamable: Record<string, StreamableHTTPServerTransport>;
@@ -214,6 +233,16 @@ export async function createServer(): Promise<Server> {
     const transport = transports.streamable[sessionId];
     await transport.handleRequest(req, res);
   });
+
+  // Apply bearer auth to legacy SSE endpoints
+  if (!config.bypassAuth) {
+    app.use(['/sse', '/messages'], requireBearerAuth({
+      verifier: oauth,
+      requiredScopes: [],
+      resourceMetadataUrl,
+    }));
+    logger.info('Bearer auth required for legacy SSE endpoints');
+  }
 
   // Legacy SSE endpoint for older clients
   app.get('/sse', async (req: Request, res: Response) => {
