@@ -96,16 +96,35 @@ export class YouTubeMusicClient {
 
     try {
       logger.info('Fetching visitor ID from YouTube Music');
-      const response = await got.get(YTM_BASE_URL);
+      const response = await got.get(YTM_BASE_URL, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
+        },
+      });
       const body = String(response.body);
-      const match = body.match(/ytcfg\.set\s*\(\s*({.+?})\s*\)\s*;/);
+
+      // Try multiple patterns to find visitor ID
+      let match = body.match(/ytcfg\.set\s*\(\s*({.+?})\s*\)\s*;/);
+
+      if (!match) {
+        // Try alternative pattern
+        match = body.match(/"VISITOR_DATA"\s*:\s*"([^"]+)"/);
+        if (match && match[1]) {
+          this.visitorId = match[1];
+          logger.info('Visitor ID found with alternative pattern', { visitorId: this.visitorId });
+          return this.visitorId;
+        }
+      }
 
       if (match && match[1]) {
         const ytcfg = JSON.parse(match[1]);
         this.visitorId = ytcfg.VISITOR_DATA || '';
         logger.info('Visitor ID fetched successfully', { visitorId: this.visitorId });
       } else {
-        logger.warn('No visitor ID found in YouTube Music response');
+        logger.warn('No visitor ID found in YouTube Music response', {
+          bodyLength: body.length,
+          bodyPreview: body.substring(0, 500)
+        });
         this.visitorId = '';
       }
     } catch (error) {
