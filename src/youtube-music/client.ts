@@ -66,7 +66,6 @@ export class YouTubeMusicClient {
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en-US,en;q=0.9',
         'Content-Type': 'application/json',
-        'Content-Encoding': 'gzip',
         'Origin': YTM_BASE_URL,
         'Referer': `${YTM_BASE_URL}/`,
         'X-Youtube-Client-Name': '67',
