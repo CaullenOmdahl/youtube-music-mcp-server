@@ -261,9 +261,9 @@ export class YouTubeMusicClient {
       });
 
       // Navigate to search results
-      const contents =
-        (response as any)?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]
-          ?.tabRenderer?.content?.sectionListRenderer?.contents;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const contents = (response as any)?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]
+        ?.tabRenderer?.content?.sectionListRenderer?.contents;
 
       if (!Array.isArray(contents)) {
         return undefined;

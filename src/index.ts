@@ -26,6 +26,7 @@ export interface ServerContext {
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
   sessions: SessionManager;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any; // Database client for adaptive playlists
 }
 

@@ -20,8 +20,11 @@ export function registerAdaptivePlaylistTools(
   const sessionManager = new SessionManager(context.db);
   const recommendationEngine = new RecommendationEngine(
     {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ytMusic: context.ytMusic as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       musicBrainz: context.musicBrainz as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       listenBrainz: context.listenBrainz as any,
       db: context.db,
       userId: '', // Will be set per request
@@ -489,7 +492,7 @@ export function registerAdaptivePlaylistTools(
  */
 function generateNextQuestion(
   session: { questionsAsked: number; confidence: number; profile: Partial<Profile> },
-  extractedInfo?: Partial<Profile>
+  _extractedInfo?: Partial<Profile>
 ): string {
   const questions = session.questionsAsked;
 

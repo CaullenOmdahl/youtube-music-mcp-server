@@ -1,5 +1,4 @@
 import got, { Got } from 'got';
-import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { tokenStore } from '../auth/token-store.js';
 import type { YouTubeMusicClient } from '../youtube-music/client.js';
@@ -75,7 +74,9 @@ export class YouTubeDataClient {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = response.body as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const items = (data.items || []).map((item: any) => ({
           id: item.id,
           title: item.snippet.title,
@@ -135,6 +136,7 @@ export class YouTubeDataClient {
         },
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = response.body as any;
       logger.info('Playlist created', { playlistId: data.id });
       return data.id;
@@ -191,6 +193,7 @@ export class YouTubeDataClient {
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: any = {
         id: playlistId,
         snippet: {},
@@ -236,7 +239,7 @@ export class YouTubeDataClient {
 
     for (const videoId of videoIds) {
       try {
-        const response = await this.client.post('playlistItems', {
+        await this.client.post('playlistItems', {
           searchParams: {
             part: 'snippet',
           },
@@ -258,6 +261,7 @@ export class YouTubeDataClient {
         results.push({ videoId, success: true });
         successCount++;
         logger.debug('Video added to playlist', { playlistId, videoId });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         failureCount++;
         const errorMessage = error?.response?.body?.error?.message ||
@@ -337,6 +341,7 @@ export class YouTubeDataClient {
   /**
    * Get playlist items (songs in a playlist) with pagination and enrichment
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getPlaylistItems(playlistId: string, maxResults: number = 50): Promise<any[]> {
     const accessToken = this.getAccessToken();
     if (!accessToken) {
@@ -344,6 +349,7 @@ export class YouTubeDataClient {
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items: any[] = [];
       let pageToken: string | undefined;
       const perPage = Math.min(maxResults, 50); // API max is 50
@@ -361,7 +367,9 @@ export class YouTubeDataClient {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = response.body as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pageItems = (data.items || []).map((item: any) => ({
           playlistItemId: item.id,
           videoId: item.contentDetails.videoId,
@@ -388,7 +396,7 @@ export class YouTubeDataClient {
 
       return finalItems.map(item => {
         const enrichment = enrichedData.get(item.videoId);
-        const { thumbnails, ...itemWithoutThumbnails } = item;
+        const { thumbnails: _thumbnails, ...itemWithoutThumbnails } = item;
         return this.cleanObject({
           ...itemWithoutThumbnails,
           duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : undefined,
@@ -411,12 +419,14 @@ export class YouTubeDataClient {
    * Enrich video data with YouTube Music metadata (album, artists, etc.)
    * Fetches detailed song information from YouTube Music API
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async enrichVideoData(videoIds: string[]): Promise<Map<string, any>> {
     const accessToken = this.getAccessToken();
     if (!accessToken || videoIds.length === 0) {
       return new Map();
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrichedData = new Map<string, any>();
 
     // First get duration from YouTube Data API in batches of 50
@@ -434,7 +444,9 @@ export class YouTubeDataClient {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = response.body as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (data.items || []).forEach((item: any) => {
           enrichedData.set(item.id, {
             durationSeconds: this.parseDuration(item.contentDetails?.duration),
@@ -471,7 +483,7 @@ export class YouTubeDataClient {
             year: song.year,
             explicit,
           });
-        } catch (error) {
+        } catch {
           // YouTube Music API call failed, keep the data we have
           logger.debug('Failed to get YouTube Music metadata', { videoId });
         }
@@ -484,6 +496,7 @@ export class YouTubeDataClient {
   /**
    * Remove null/undefined values from object
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private cleanObject(obj: any): any {
     return Object.fromEntries(
       Object.entries(obj).filter(([_, v]) => v != null)
@@ -526,6 +539,7 @@ export class YouTubeDataClient {
    * Get liked music from YouTube Music (playlist ID: LM) with pagination support
    * This returns ONLY music liked in YouTube Music, not all YouTube videos
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getLikedVideos(maxResults: number = 50): Promise<any[]> {
     const accessToken = this.getAccessToken();
     if (!accessToken) {
@@ -533,6 +547,7 @@ export class YouTubeDataClient {
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const songs: any[] = [];
       let pageToken: string | undefined;
       const perPage = Math.min(maxResults, 50); // API max is 50
@@ -552,7 +567,9 @@ export class YouTubeDataClient {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = response.body as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pageItems = (data.items || []).map((item: any) => ({
           videoId: item.contentDetails.videoId,
           title: item.snippet.title,
@@ -577,7 +594,7 @@ export class YouTubeDataClient {
 
       return finalSongs.map(song => {
         const enrichment = enrichedData.get(song.videoId);
-        const { thumbnails, ...songWithoutThumbnails } = song;
+        const { thumbnails: _thumbnails, ...songWithoutThumbnails } = song;
         return this.cleanObject({
           ...songWithoutThumbnails,
           duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : undefined,
