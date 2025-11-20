@@ -446,12 +446,48 @@ export function parseSong(response: unknown, videoId: string): Song {
       10
     );
 
+    // Extract album information from cards section
+    const cards = getNestedValue(
+      response,
+      'cards.cardCollectionRenderer.cards'
+    ) as unknown[] | undefined;
+
+    let albumName: string | undefined;
+    let albumYear: number | undefined;
+
+    if (Array.isArray(cards)) {
+      for (const card of cards) {
+        const teaserMessage = getNestedValue(
+          card,
+          'cardRenderer.teaser.simpleCardTeaserRenderer.message'
+        ) as YTMResponse | undefined;
+        if (teaserMessage) {
+          const albumText = extractText(teaserMessage);
+          if (albumText) {
+            albumName = albumText;
+            // Try to extract year from album name (e.g., "Album Name (2021)")
+            const yearMatch = albumText.match(/\((\d{4})\)/);
+            if (yearMatch && yearMatch[1]) {
+              albumYear = parseInt(yearMatch[1], 10);
+            }
+            break;
+          }
+        }
+      }
+    }
+
     return {
       videoId,
       title,
       artists: [{ name: author }],
       durationSeconds: lengthSeconds,
       duration: formatDuration(lengthSeconds),
+      ...(albumName && {
+        album: {
+          name: albumName,
+          ...(albumYear && { year: albumYear }),
+        },
+      }),
       thumbnails: parseThumbnails(videoDetails?.['thumbnail']),
     };
   } catch (error) {
