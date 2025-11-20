@@ -613,6 +613,56 @@ export class YouTubeDataClient {
     }
   }
 
+  /**
+   * Get ISRC code for a video
+   * Returns null if video doesn't have ISRC (user uploads, covers, etc.)
+   */
+  async getVideoISRC(videoId: string): Promise<string | null> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('No access token available');
+    }
+
+    try {
+      logger.debug('Fetching ISRC for video', { videoId });
+
+      const response = await this.client.get('videos', {
+        searchParams: {
+          part: 'contentDetails',
+          id: videoId,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = response.body as any;
+      const items = data.items || [];
+
+      if (items.length === 0) {
+        logger.debug('Video not found', { videoId });
+        return null;
+      }
+
+      const isrc = items[0]?.contentDetails?.isrc || null;
+
+      if (isrc) {
+        logger.info('ISRC found for video', { videoId, isrc });
+      } else {
+        logger.debug('No ISRC available for video', { videoId });
+      }
+
+      return isrc;
+    } catch (error) {
+      logger.error('Failed to get video ISRC', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        videoId,
+      });
+      return null;
+    }
+  }
+
   async close(): Promise<void> {
     logger.info('YouTube Data API client closed');
   }

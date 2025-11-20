@@ -51,6 +51,14 @@ export class SessionManager {
 
     // Save to database
     try {
+      // Ensure user profile exists (create if needed)
+      await this.db.query(
+        `INSERT INTO user_profiles (user_id, created_at)
+         VALUES ($1, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+
       await this.db.query(
         `INSERT INTO conversation_sessions (
           session_id, user_id, profile_partial, conversation_history,

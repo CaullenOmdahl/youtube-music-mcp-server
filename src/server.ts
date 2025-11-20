@@ -11,18 +11,20 @@ import { config } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { registerQueryTools } from './tools/query.js';
 import { registerPlaylistTools } from './tools/playlist.js';
-import { registerSmartPlaylistTools } from './tools/smart-playlist.js';
 import { registerSystemTools } from './tools/system.js';
 import { registerAdaptivePlaylistTools } from './tools/adaptive-playlist.js';
+import { registerReccoBeatsTools } from './tools/reccobeats.js';
 import { YouTubeMusicClient } from './youtube-music/client.js';
 import { YouTubeDataClient } from './youtube-data/client.js';
 import { MusicBrainzClient } from './musicbrainz/client.js';
 import { ListenBrainzClient } from './listenbrainz/client.js';
+import { SpotifyClient } from './spotify/client.js';
+import { ReccoBeatsClient } from './reccobeats/client.js';
 import { RecommendationEngine } from './recommendations/engine.js';
 import { SessionManager } from './recommendations/session.js';
 import { oauth } from './auth/smithery-oauth-provider.js';
 import { tokenStore } from './auth/token-store.js';
-import { db } from './database/client.js';
+import { db, initializeDatabase, checkDatabaseHealth } from './database/client.js';
 
 const logger = createLogger('server');
 
@@ -33,6 +35,8 @@ export interface ServerContext {
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
   sessions: SessionManager;
+  spotify: SpotifyClient;
+  reccobeats: ReccoBeatsClient;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any; // Database client for adaptive playlists
 }
@@ -54,6 +58,8 @@ export async function createServer(): Promise<Server> {
   const ytData = new YouTubeDataClient(ytMusic); // Pass ytMusic for enrichment
   const musicBrainz = new MusicBrainzClient();
   const listenBrainz = new ListenBrainzClient();
+  const spotify = new SpotifyClient();
+  const reccobeats = new ReccoBeatsClient();
   const sessions = new SessionManager();
   const recommendations = new RecommendationEngine(
     musicBrainz,
@@ -69,14 +75,16 @@ export async function createServer(): Promise<Server> {
     listenBrainz,
     recommendations,
     sessions,
+    spotify,
+    reccobeats,
     db,
   };
 
   // Register all MCP tools
   registerQueryTools(mcpServer, context);
   registerPlaylistTools(mcpServer, context);
-  registerSmartPlaylistTools(mcpServer, context);
   registerAdaptivePlaylistTools(mcpServer, context);
+  registerReccoBeatsTools(mcpServer, context);
   registerSystemTools(mcpServer, context);
 
   logger.info('MCP tools registered (including adaptive playlists)');
@@ -90,11 +98,13 @@ export async function createServer(): Promise<Server> {
   app.use(express.json());
 
   // Health check endpoint
-  app.get('/health', (_req: Request, res: Response) => {
+  app.get('/health', async (_req: Request, res: Response) => {
+    const dbHealth = await checkDatabaseHealth();
     res.json({
       status: 'healthy',
       version: '3.0.0',
       timestamp: new Date().toISOString(),
+      database: dbHealth,
     });
   });
 
@@ -342,6 +352,9 @@ export async function createServer(): Promise<Server> {
 
   return {
     async start() {
+      // Initialize database (if configured)
+      await initializeDatabase();
+
       // Start HTTP server
       httpServer = app.listen(config.port, () => {
         logger.info(`MCP HTTP server listening on port ${config.port}`);
@@ -384,6 +397,7 @@ export async function createServer(): Promise<Server> {
       await ytData.close();
       await musicBrainz.close();
       await listenBrainz.close();
+      await spotify.close();
 
       logger.info('Server shutdown complete');
     },

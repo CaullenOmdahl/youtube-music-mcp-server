@@ -22,10 +22,15 @@ export class RecommendationEngine {
     private context: AdaptivePlaylistContext,
     private db: Database
   ) {
-    // Note: context.musicBrainz should be an instance of MusicBrainzClient
-    // We're passing it directly assuming the ServerContext provides the proper type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.featureExtractor = new SongFeatureExtractor(context.musicBrainz as any, db);
+    // Note: context.musicBrainz and context.spotify should be instances of their respective clients
+    // We're passing them directly assuming the ServerContext provides the proper types
+    this.featureExtractor = new SongFeatureExtractor(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      context.musicBrainz as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      context.spotify as any,
+      db
+    );
   }
 
   /**
@@ -95,7 +100,7 @@ export class RecommendationEngine {
   }
 
   /**
-   * Get candidate tracks from YouTube Music
+   * Get candidate tracks from multiple sources (Reccobeats, YouTube Music, Library)
    */
   private async getCandidates(
     profile: Profile,
@@ -103,23 +108,112 @@ export class RecommendationEngine {
   ): Promise<{ videoId: string; title: string; artist: string; year?: number }[]> {
     const candidates: { videoId: string; title: string; artist: string; year?: number }[] = [];
 
-    try {
-      // Use provided search queries or generate from profile
-      const queries =
-        searchQueries || this.generateSearchQueries(profile);
+    // SOURCE 1: Reccobeats (primary source for mood/seed-based discovery)
+    if (this.context.reccobeats) {
+      try {
+        const shouldUseReccobeats =
+          (profile.mood?.targetValence !== undefined && profile.mood.targetValence >= 0) ||
+          (profile.mood?.targetArousal !== undefined && profile.mood.targetArousal >= 0) ||
+          (profile.seedArtists && profile.seedArtists.length > 0) ||
+          (profile.seedTracks && profile.seedTracks.length > 0);
 
-      for (const query of queries.slice(0, 5)) {
-        // Limit to 5 queries
+        if (shouldUseReccobeats) {
+          logger.debug('Using Reccobeats for candidate generation', {
+            hasValence: profile.mood?.targetValence !== undefined,
+            hasEnergy: profile.mood?.targetArousal !== undefined,
+            seedArtists: profile.seedArtists?.length || 0,
+            seedTracks: profile.seedTracks?.length || 0,
+          });
+
+          // Prepare Reccobeats params
+          const reccobeatsParams: {
+            targetValence?: number;
+            targetEnergy?: number;
+            seedArtists?: string[];
+            limit?: number;
+          } = {
+            limit: 50,
+          };
+
+          // Map valence (0-35) to Reccobeats format (0.0-1.0)
+          if (profile.mood?.targetValence !== undefined && profile.mood.targetValence >= 0) {
+            reccobeatsParams.targetValence = profile.mood.targetValence / 35;
+          }
+
+          // Map arousal (0-35) to energy (0.0-1.0)
+          if (profile.mood?.targetArousal !== undefined && profile.mood.targetArousal >= 0) {
+            reccobeatsParams.targetEnergy = profile.mood.targetArousal / 35;
+          }
+
+          // Use seed artists if provided
+          if (profile.seedArtists && profile.seedArtists.length > 0) {
+            reccobeatsParams.seedArtists = profile.seedArtists;
+          }
+
+          // Get recommendations from Reccobeats
+          const reccobeatsResults = await this.context.reccobeats.getRecommendations(reccobeatsParams);
+
+          logger.debug('Reccobeats returned results', { count: reccobeatsResults.length });
+
+          // Search YouTube Music for each Reccobeats recommendation
+          for (const track of reccobeatsResults.slice(0, 30)) {
+            try {
+              const { title, artist } = track as { title: string; artist: string };
+              const searchQuery = `${title} ${artist}`;
+              const searchResult = await this.context.ytMusic.search(searchQuery, {
+                filter: 'songs',
+                limit: 3,
+              });
+
+              const songs = (searchResult as { songs?: unknown[] })?.songs || [];
+              if (songs.length > 0) {
+                const firstSong = songs[0] as {
+                  videoId: string;
+                  title: string;
+                  artists: { name: string }[];
+                  year?: number;
+                };
+
+                candidates.push({
+                  videoId: firstSong.videoId,
+                  title: firstSong.title,
+                  artist: firstSong.artists?.[0]?.name || 'Unknown',
+                  year: firstSong.year,
+                });
+              }
+            } catch (error) {
+              const { title, artist } = track as { title: string; artist: string };
+              logger.debug('Failed to find Reccobeats recommendation on YouTube Music', {
+                track: title,
+                artist: artist,
+              });
+            }
+          }
+
+          logger.info('Retrieved candidates from Reccobeats', { count: candidates.length });
+        }
+      } catch (error) {
+        logger.warn('Reccobeats candidate generation failed', { error });
+      }
+    }
+
+    // SOURCE 2: YouTube Music Search (for context-specific needs or when Reccobeats unavailable)
+    try {
+      const queries = searchQueries || this.generateSearchQueries(profile);
+
+      // Reduced query count if we already have Reccobeats results
+      const queryLimit = candidates.length > 0 ? 2 : 5;
+
+      for (const query of queries.slice(0, queryLimit)) {
         try {
           const searchResult = await this.context.ytMusic.search(query, {
             filter: 'songs',
-            limit: 20,
+            limit: candidates.length > 0 ? 10 : 20, // Fewer if we have Reccobeats
           });
 
           const songs = (searchResult as { songs?: unknown[] })?.songs || [];
 
-          for (const song of songs.slice(0, 15)) {
-            // Max 15 per query
+          for (const song of songs.slice(0, 10)) {
             const s = song as {
               videoId: string;
               title: string;
@@ -138,37 +232,39 @@ export class RecommendationEngine {
           logger.warn('Search query failed', { query, error });
         }
       }
+    } catch (error) {
+      logger.warn('YouTube Music search failed', { error });
+    }
 
-      // Also get from user's library
-      try {
-        const librarySongs = await this.context.ytMusic.getLibrarySongs(50);
+    // SOURCE 3: User Library (for familiarity)
+    try {
+      const librarySongs = await this.context.ytMusic.getLibrarySongs(50);
 
-        for (const song of librarySongs.slice(0, 30)) {
-          const s = song as {
-            videoId: string;
-            title: string;
-            artists: { name: string }[];
-            year?: number;
-          };
+      for (const song of librarySongs.slice(0, 30)) {
+        const s = song as {
+          videoId: string;
+          title: string;
+          artists: { name: string }[];
+          year?: number;
+        };
 
-          candidates.push({
-            videoId: s.videoId,
-            title: s.title,
-            artist: s.artists?.[0]?.name || 'Unknown',
-            year: s.year,
-          });
-        }
-      } catch (error) {
-        logger.debug('Failed to get library songs', { error });
+        candidates.push({
+          videoId: s.videoId,
+          title: s.title,
+          artist: s.artists?.[0]?.name || 'Unknown',
+          year: s.year,
+        });
       }
     } catch (error) {
-      logger.error('Failed to get candidates', { error });
+      logger.debug('Failed to get library songs', { error });
     }
 
     // Deduplicate by videoId
     const uniqueCandidates = Array.from(
       new Map(candidates.map((c) => [c.videoId, c])).values()
     );
+
+    logger.info('Total unique candidates from all sources', { count: uniqueCandidates.length });
 
     return uniqueCandidates;
   }

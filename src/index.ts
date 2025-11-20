@@ -5,13 +5,14 @@ import { config } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { registerQueryTools } from './tools/query.js';
 import { registerPlaylistTools } from './tools/playlist.js';
-import { registerSmartPlaylistTools } from './tools/smart-playlist.js';
 import { registerSystemTools } from './tools/system.js';
 import { registerAdaptivePlaylistTools } from './tools/adaptive-playlist.js';
 import { YouTubeMusicClient } from './youtube-music/client.js';
 import { YouTubeDataClient } from './youtube-data/client.js';
 import { MusicBrainzClient } from './musicbrainz/client.js';
 import { ListenBrainzClient } from './listenbrainz/client.js';
+import { SpotifyClient } from './spotify/client.js';
+import { ReccoBeatsClient } from './reccobeats/client.js';
 import { RecommendationEngine } from './recommendations/engine.js';
 import { SessionManager } from './recommendations/session.js';
 import { oauth as oauthProvider } from './auth/smithery-oauth-provider.js';
@@ -26,6 +27,8 @@ export interface ServerContext {
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
   sessions: SessionManager;
+  spotify: SpotifyClient;
+  reccobeats: ReccoBeatsClient;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any; // Database client for adaptive playlists
 }
@@ -52,6 +55,8 @@ export default function createServer({ auth }: { auth: AuthInfo }) {
   const ytData = new YouTubeDataClient(ytMusic); // Pass ytMusic for enrichment
   const musicBrainz = new MusicBrainzClient();
   const listenBrainz = new ListenBrainzClient();
+  const spotify = new SpotifyClient();
+  const reccobeats = new ReccoBeatsClient();
   const sessions = new SessionManager();
   const recommendations = new RecommendationEngine(
     musicBrainz,
@@ -67,13 +72,14 @@ export default function createServer({ auth }: { auth: AuthInfo }) {
     listenBrainz,
     recommendations,
     sessions,
+    spotify,
+    reccobeats,
     db,
   };
 
   // Register all MCP tools
   registerQueryTools(mcpServer, context);
   registerPlaylistTools(mcpServer, context);
-  registerSmartPlaylistTools(mcpServer, context);
   registerAdaptivePlaylistTools(mcpServer, context);
   registerSystemTools(mcpServer, context);
 

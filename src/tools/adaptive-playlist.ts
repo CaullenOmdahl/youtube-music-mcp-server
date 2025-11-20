@@ -25,6 +25,8 @@ export function registerAdaptivePlaylistTools(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       musicBrainz: context.musicBrainz as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      spotify: context.spotify as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       listenBrainz: context.listenBrainz as any,
       db: context.db,
       userId: '', // Will be set per request
@@ -40,7 +42,7 @@ export function registerAdaptivePlaylistTools(
     {
       title: 'Start Playlist Conversation',
       description:
-        'Start an AI-guided conversation to build a personalized playlist. Returns a session ID and initial message.',
+        'Start an AI-guided conversation to build a personalized playlist. WORKFLOW: 1) Call this to create session 2) Use get_library_songs to analyze user\'s music 3) Use get_user_taste_profile if available 4) Use AskUserQuestion tool to present smart options based on their library (genres found, moods, similar artists) 5) Extract user selections into profile using continue_conversation with extractedInfo 6) Repeat until confidence >= 21 7) Call generate_adaptive_playlist. Present structured choices using AskUserQuestion - don\'t ask open-ended questions.',
       inputSchema: {
         userId: z
           .string()
@@ -99,14 +101,14 @@ export function registerAdaptivePlaylistTools(
     {
       title: 'Continue Conversation',
       description:
-        'Continue the AI-guided conversation with user response. AI extracts preferences and determines next question or if ready for generation.',
+        'Continue the AI-guided conversation with user response. IMPORTANT: The AI (you) must extract preference information from user\'s response and pass in extractedInfo. If you presented options via AskUserQuestion, extract the user\'s selection into structured profile data. Example: User selects "Calm" mood → extractedInfo: {mood: {calm: 25, energized: 10}}. User selects "Indie Rock, Electronic" genres → extractedInfo: {tertiary: {genres: ["indie rock", "electronic"]}}. User wants "Focus music" → extractedInfo: {tertiary: {context: "focus"}}. Extract dimensions (mellow/sophisticated/intense/contemporary/unpretentious as 0-35 numbers), mood (object with mood keys and scores), discovery (curious/safe/balanced), sophistication (mainstream/niche/balanced), age (modern/classic/mixed), tertiary (genres array, artists array, context string). NEW: Also extract seedArtists (array of artist names), seedTracks (array of {title, artist} objects), preferTags (genres/styles to prefer), avoidTags (genres/styles to avoid), diversity (focused/balanced/diverse for discovery preference).',
       inputSchema: {
         sessionId: z.string().describe('Session ID from start_playlist_conversation'),
         userMessage: z.string().describe('User response to the AI question'),
         extractedInfo: z
           .record(z.unknown())
           .optional()
-          .describe('AI-extracted profile information (optional)'),
+          .describe('AI-extracted profile information. You (the AI) must extract this from userMessage. Include any of: dimensions (mellow/sophisticated/intense/contemporary/unpretentious as numbers 0-35), mood (happy/calm/energized/sad), discovery (curious/safe/balanced), sophistication (mainstream/niche/balanced), age (modern/classic/mixed), tertiary (genres array, artists array, context string like "workout" or "focus"), seedArtists (array of artist names when user mentions specific artists as seeds), seedTracks (array of {title, artist} when user wants specific tracks), preferTags (array of genre/style tags to prefer like ["electronic", "ambient"]), avoidTags (array of genre/style tags to avoid like ["metal", "loud"]), diversity ("focused"/"balanced"/"diverse" when user indicates discovery vs familiarity preference)'),
       },
       annotations: {
         readOnlyHint: false,

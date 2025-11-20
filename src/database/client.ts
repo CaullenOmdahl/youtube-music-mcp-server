@@ -1,62 +1,81 @@
 import { Pool, PoolClient } from 'pg';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { config } from '../config.js';
 
-// Environment configuration
-const isProduction = process.env.NODE_ENV === 'production';
-const maxConnections = parseInt(process.env.DATABASE_POOL_MAX || '20');
-const minConnections = parseInt(process.env.DATABASE_POOL_MIN || '5');
+// ES module __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// Create connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+// Create connection pool (will be null if no DATABASE_URL configured)
+let pool: Pool | null = null;
 
-  // Pool settings
-  min: minConnections,
-  max: maxConnections,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  statement_timeout: 10000, // 10s max per query
+if (config.databaseUrl) {
+  const isProduction = config.nodeEnv === 'production';
 
-  // Keep-alive
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 10000,
+  pool = new Pool({
+    connectionString: config.databaseUrl,
+    ssl: isProduction ? { rejectUnauthorized: false } : false,
 
-  application_name: 'youtube-music-mcp'
-});
+    // Pool settings
+    min: config.databasePoolMin,
+    max: config.databasePoolMax,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    statement_timeout: 10000, // 10s max per query
+
+    // Keep-alive
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+
+    application_name: 'youtube-music-mcp'
+  });
+} else {
+  console.warn('⚠️  DATABASE_URL not configured - adaptive playlists will not be available');
+}
 
 // Event handlers
-pool.on('connect', () => {
-  console.log('🔌 New database connection established');
-});
+if (pool) {
+  pool.on('connect', () => {
+    console.log('🔌 New database connection established');
+  });
 
-pool.on('acquire', () => {
-  const activeConnections = pool.totalCount;
-  const waitingClients = pool.waitingCount;
+  pool.on('acquire', () => {
+    if (!pool) return;
+    const activeConnections = pool.totalCount;
+    const waitingClients = pool.waitingCount;
 
-  if (waitingClients > 5) {
-    console.warn(`⚠️  High connection wait queue: ${waitingClients} clients waiting`);
-  }
+    if (waitingClients > 5) {
+      console.warn(`⚠️  High connection wait queue: ${waitingClients} clients waiting`);
+    }
 
-  if (activeConnections > maxConnections * 0.8) {
-    console.warn(`⚠️  Connection pool near capacity: ${activeConnections}/${maxConnections}`);
-  }
-});
+    if (activeConnections > config.databasePoolMax * 0.8) {
+      console.warn(`⚠️  Connection pool near capacity: ${activeConnections}/${config.databasePoolMax}`);
+    }
+  });
 
-pool.on('error', (err) => {
-  console.error('❌ Unexpected database error:', err);
-});
+  pool.on('error', (err) => {
+    console.error('❌ Unexpected database error:', err);
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🔄 Draining database connection pool...');
-  await pool.end();
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('🔄 Draining database connection pool...');
+    if (pool) {
+      await pool.end();
+    }
+    process.exit(0);
+  });
+}
 
 // Initialize database (run migrations)
 export async function initializeDatabase(): Promise<void> {
+  if (!pool) {
+    console.log('⏭️  Skipping database initialization - no DATABASE_URL configured');
+    return;
+  }
+
   try {
     console.log('🔄 Initializing database...');
 
@@ -87,6 +106,15 @@ export async function checkDatabaseHealth(): Promise<{
   idleConnections: number;
   waitingClients: number;
 }> {
+  if (!pool) {
+    return {
+      healthy: false,
+      totalConnections: 0,
+      idleConnections: 0,
+      waitingClients: 0
+    };
+  }
+
   return {
     healthy: pool.totalCount > 0,
     totalConnections: pool.totalCount,
@@ -99,6 +127,10 @@ export async function checkDatabaseHealth(): Promise<{
 export const db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: async (text: string, params?: any[]) => {
+    if (!pool) {
+      throw new Error('Database not configured - DATABASE_URL is missing');
+    }
+
     const start = Date.now();
     try {
       const result = await pool.query(text, params);
@@ -116,7 +148,12 @@ export const db = {
     }
   },
 
-  getClient: (): Promise<PoolClient> => pool.connect()
+  getClient: (): Promise<PoolClient> => {
+    if (!pool) {
+      throw new Error('Database not configured - DATABASE_URL is missing');
+    }
+    return pool.connect();
+  }
 };
 
 export default db;
