@@ -44,7 +44,7 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Get user's playlists
+   * Get user's playlists (with pagination support)
    */
   async getPlaylists(maxResults: number = 25): Promise<Playlist[]> {
     const accessToken = this.getAccessToken();
@@ -53,25 +53,42 @@ export class YouTubeDataClient {
     }
 
     try {
-      const response = await this.client.get('playlists', {
-        searchParams: {
-          part: 'snippet,contentDetails,status',
-          mine: 'true',
-          maxResults,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const playlists: Playlist[] = [];
+      let pageToken: string | undefined;
+      const perPage = Math.min(maxResults, 50); // API max is 50
 
-      const data = response.body as any;
-      return (data.items || []).map((item: any) => ({
-        id: item.id,
-        title: item.snippet.title,
-        description: item.snippet.description || '',
-        privacy: item.status.privacyStatus,
-        videoCount: item.contentDetails.itemCount,
-      }));
+      do {
+        const response = await this.client.get('playlists', {
+          searchParams: {
+            part: 'snippet,contentDetails,status',
+            mine: 'true',
+            maxResults: perPage,
+            ...(pageToken && { pageToken }),
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const data = response.body as any;
+        const items = (data.items || []).map((item: any) => ({
+          id: item.id,
+          title: item.snippet.title,
+          description: item.snippet.description || '',
+          privacy: item.status.privacyStatus,
+          videoCount: item.contentDetails.itemCount,
+        }));
+
+        playlists.push(...items);
+        pageToken = data.nextPageToken;
+
+        // Stop if we have enough results
+        if (playlists.length >= maxResults) {
+          break;
+        }
+      } while (pageToken);
+
+      return playlists.slice(0, maxResults);
     } catch (error) {
       logger.error('Failed to get playlists', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -275,7 +292,7 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Get playlist items (songs in a playlist)
+   * Get playlist items (songs in a playlist) with pagination support
    */
   async getPlaylistItems(playlistId: string, maxResults: number = 50): Promise<any[]> {
     const accessToken = this.getAccessToken();
@@ -284,25 +301,42 @@ export class YouTubeDataClient {
     }
 
     try {
-      const response = await this.client.get('playlistItems', {
-        searchParams: {
-          part: 'snippet,contentDetails',
-          playlistId,
-          maxResults,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const items: any[] = [];
+      let pageToken: string | undefined;
+      const perPage = Math.min(maxResults, 50); // API max is 50
 
-      const data = response.body as any;
-      return (data.items || []).map((item: any) => ({
-        playlistItemId: item.id,
-        videoId: item.contentDetails.videoId,
-        title: item.snippet.title,
-        artist: item.snippet.videoOwnerChannelTitle,
-        position: item.snippet.position,
-      }));
+      do {
+        const response = await this.client.get('playlistItems', {
+          searchParams: {
+            part: 'snippet,contentDetails',
+            playlistId,
+            maxResults: perPage,
+            ...(pageToken && { pageToken }),
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const data = response.body as any;
+        const pageItems = (data.items || []).map((item: any) => ({
+          playlistItemId: item.id,
+          videoId: item.contentDetails.videoId,
+          title: item.snippet.title,
+          artist: item.snippet.videoOwnerChannelTitle,
+          position: item.snippet.position,
+        }));
+
+        items.push(...pageItems);
+        pageToken = data.nextPageToken;
+
+        // Stop if we have enough results
+        if (items.length >= maxResults) {
+          break;
+        }
+      } while (pageToken);
+
+      return items.slice(0, maxResults);
     } catch (error) {
       logger.error('Failed to get playlist items', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -312,7 +346,7 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Get liked music from YouTube Music (playlist ID: LM)
+   * Get liked music from YouTube Music (playlist ID: LM) with pagination support
    * This returns ONLY music liked in YouTube Music, not all YouTube videos
    */
   async getLikedVideos(maxResults: number = 50): Promise<any[]> {
@@ -322,28 +356,45 @@ export class YouTubeDataClient {
     }
 
     try {
-      // Use YouTube Music's "Liked Music" playlist (ID: LM)
-      // This filters to only music, not all YouTube likes
-      const response = await this.client.get('playlistItems', {
-        searchParams: {
-          part: 'snippet,contentDetails',
-          playlistId: 'LM',
-          maxResults,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const songs: any[] = [];
+      let pageToken: string | undefined;
+      const perPage = Math.min(maxResults, 50); // API max is 50
 
-      const data = response.body as any;
-      return (data.items || []).map((item: any) => ({
-        videoId: item.contentDetails.videoId,
-        title: item.snippet.title,
-        artist: item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle,
-        album: null,
-        duration: null,
-        thumbnails: item.snippet.thumbnails || {},
-      }));
+      do {
+        // Use YouTube Music's "Liked Music" playlist (ID: LM)
+        // This filters to only music, not all YouTube likes
+        const response = await this.client.get('playlistItems', {
+          searchParams: {
+            part: 'snippet,contentDetails',
+            playlistId: 'LM',
+            maxResults: perPage,
+            ...(pageToken && { pageToken }),
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const data = response.body as any;
+        const pageItems = (data.items || []).map((item: any) => ({
+          videoId: item.contentDetails.videoId,
+          title: item.snippet.title,
+          artist: item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle,
+          album: null,
+          duration: null,
+          thumbnails: item.snippet.thumbnails || {},
+        }));
+
+        songs.push(...pageItems);
+        pageToken = data.nextPageToken;
+
+        // Stop if we have enough results
+        if (songs.length >= maxResults) {
+          break;
+        }
+      } while (pageToken);
+
+      return songs.slice(0, maxResults);
     } catch (error) {
       logger.error('Failed to get liked music from YouTube Music', {
         error: error instanceof Error ? error.message : 'Unknown error',
