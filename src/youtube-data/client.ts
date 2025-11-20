@@ -292,7 +292,7 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Get playlist items (songs in a playlist) with pagination support
+   * Get playlist items (songs in a playlist) with pagination and enrichment
    */
   async getPlaylistItems(playlistId: string, maxResults: number = 50): Promise<any[]> {
     const accessToken = this.getAccessToken();
@@ -323,8 +323,9 @@ export class YouTubeDataClient {
           playlistItemId: item.id,
           videoId: item.contentDetails.videoId,
           title: item.snippet.title,
-          artist: item.snippet.videoOwnerChannelTitle,
+          artist: item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle,
           position: item.snippet.position,
+          thumbnails: item.snippet.thumbnails || {},
         }));
 
         items.push(...pageItems);
@@ -336,13 +337,101 @@ export class YouTubeDataClient {
         }
       } while (pageToken);
 
-      return items.slice(0, maxResults);
+      const finalItems = items.slice(0, maxResults);
+
+      // Enrich with video details (duration, etc.)
+      const videoIds = finalItems.map(item => item.videoId);
+      const enrichedData = await this.enrichVideoData(videoIds);
+
+      return finalItems.map(item => {
+        const enrichment = enrichedData.get(item.videoId);
+        return {
+          ...item,
+          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : null,
+          durationSeconds: enrichment?.durationSeconds || null,
+        };
+      });
     } catch (error) {
       logger.error('Failed to get playlist items', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
+  }
+
+  /**
+   * Enrich video data with additional details (duration, category, etc.)
+   * Fetches up to 50 videos per API call
+   */
+  private async enrichVideoData(videoIds: string[]): Promise<Map<string, any>> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken || videoIds.length === 0) {
+      return new Map();
+    }
+
+    const enrichedData = new Map<string, any>();
+
+    // Process in batches of 50 (API limit)
+    for (let i = 0; i < videoIds.length; i += 50) {
+      const batch = videoIds.slice(i, i + 50);
+
+      try {
+        const response = await this.client.get('videos', {
+          searchParams: {
+            part: 'contentDetails,snippet',
+            id: batch.join(','),
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const data = response.body as any;
+        (data.items || []).forEach((item: any) => {
+          enrichedData.set(item.id, {
+            duration: item.contentDetails?.duration || null,
+            durationSeconds: this.parseDuration(item.contentDetails?.duration),
+            description: item.snippet?.description || '',
+          });
+        });
+      } catch (error) {
+        logger.warn('Failed to enrich video batch', { error, batchSize: batch.length });
+      }
+    }
+
+    return enrichedData;
+  }
+
+  /**
+   * Parse ISO 8601 duration to seconds
+   */
+  private parseDuration(isoDuration: string | null): number | null {
+    if (!isoDuration) return null;
+
+    const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return null;
+
+    const hours = parseInt(match[1] || '0');
+    const minutes = parseInt(match[2] || '0');
+    const seconds = parseInt(match[3] || '0');
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  /**
+   * Format seconds to human-readable duration (MM:SS or H:MM:SS)
+   */
+  private formatDuration(seconds: number | null): string | null {
+    if (seconds === null) return null;
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
   /**
@@ -380,8 +469,6 @@ export class YouTubeDataClient {
           videoId: item.contentDetails.videoId,
           title: item.snippet.title,
           artist: item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle,
-          album: null,
-          duration: null,
           thumbnails: item.snippet.thumbnails || {},
         }));
 
@@ -394,7 +481,20 @@ export class YouTubeDataClient {
         }
       } while (pageToken);
 
-      return songs.slice(0, maxResults);
+      const finalSongs = songs.slice(0, maxResults);
+
+      // Enrich with video details (duration, etc.)
+      const videoIds = finalSongs.map(s => s.videoId);
+      const enrichedData = await this.enrichVideoData(videoIds);
+
+      return finalSongs.map(song => {
+        const enrichment = enrichedData.get(song.videoId);
+        return {
+          ...song,
+          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : null,
+          durationSeconds: enrichment?.durationSeconds || null,
+        };
+      });
     } catch (error) {
       logger.error('Failed to get liked music from YouTube Music', {
         error: error instanceof Error ? error.message : 'Unknown error',
