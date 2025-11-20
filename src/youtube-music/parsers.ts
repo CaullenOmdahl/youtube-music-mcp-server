@@ -446,6 +446,21 @@ export function parseSong(response: unknown, videoId: string): Song {
       10
     );
 
+    // Extract year from microformat publish date
+    const microformat = getNestedValue(
+      response,
+      'microformat.microformatDataRenderer'
+    ) as YTMResponse | undefined;
+
+    const publishDate = microformat?.['publishDate'] as string | undefined;
+    let year: number | undefined;
+    if (publishDate) {
+      const yearMatch = publishDate.match(/^(\d{4})/);
+      if (yearMatch && yearMatch[1]) {
+        year = parseInt(yearMatch[1], 10);
+      }
+    }
+
     // Extract album information from cards section
     const cards = getNestedValue(
       response,
@@ -453,7 +468,6 @@ export function parseSong(response: unknown, videoId: string): Song {
     ) as unknown[] | undefined;
 
     let albumName: string | undefined;
-    let albumYear: number | undefined;
 
     if (Array.isArray(cards)) {
       for (const card of cards) {
@@ -465,11 +479,6 @@ export function parseSong(response: unknown, videoId: string): Song {
           const albumText = extractText(teaserMessage);
           if (albumText) {
             albumName = albumText;
-            // Try to extract year from album name (e.g., "Album Name (2021)")
-            const yearMatch = albumText.match(/\((\d{4})\)/);
-            if (yearMatch && yearMatch[1]) {
-              albumYear = parseInt(yearMatch[1], 10);
-            }
             break;
           }
         }
@@ -482,10 +491,11 @@ export function parseSong(response: unknown, videoId: string): Song {
       artists: [{ name: author }],
       durationSeconds: lengthSeconds,
       duration: formatDuration(lengthSeconds),
+      ...(year && { year }),
       ...(albumName && {
         album: {
           name: albumName,
-          ...(albumYear && { year: albumYear }),
+          ...(year && { year }),
         },
       }),
       thumbnails: parseThumbnails(videoDetails?.['thumbnail']),
