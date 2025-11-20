@@ -115,9 +115,9 @@ export class YouTubeMusicClient {
     }
 
     try {
-      // Make an authenticated request to YouTube Music to establish session
-      // This will set the necessary cookies in our CookieJar
-      await got.get(YTM_BASE_URL, {
+      // Step 1: Establish Google session with OAuth token
+      // This sets Google authentication cookies
+      await got.get('https://accounts.google.com/ServiceLogin', {
         cookieJar: this.cookieJar,
         headers: {
           'Authorization': `Bearer ${token.accessToken}`,
@@ -126,7 +126,21 @@ export class YouTubeMusicClient {
         followRedirect: true,
       });
 
-      logger.info('YouTube Music session initialized with OAuth token');
+      // Step 2: Visit YouTube Music to propagate the session
+      // Google cookies should now authenticate us with YouTube
+      await got.get(YTM_BASE_URL, {
+        cookieJar: this.cookieJar,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        followRedirect: true,
+      });
+
+      const cookies = await this.cookieJar.getCookies(YTM_BASE_URL);
+      logger.info('YouTube Music session initialized', {
+        cookieCount: cookies.length,
+        hasSID: cookies.some(c => c.key === 'SID'),
+      });
     } catch (error) {
       logger.warn('Failed to initialize YouTube Music session', {
         error: error instanceof Error ? error.message : 'Unknown error',
