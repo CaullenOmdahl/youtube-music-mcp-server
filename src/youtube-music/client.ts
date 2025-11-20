@@ -50,6 +50,7 @@ export interface SearchOptions {
 export class YouTubeMusicClient {
   private client: Got;
   private rateLimiter: RateLimiter;
+  private visitorId: string | null = null;
 
   constructor() {
     this.rateLimiter = new RateLimiter('youtube-music', {
@@ -61,10 +62,12 @@ export class YouTubeMusicClient {
     this.client = got.extend({
       prefixUrl: YTM_API_URL,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
         'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en-US,en;q=0.9',
         'Content-Type': 'application/json',
+        'Content-Encoding': 'gzip',
         'Origin': YTM_BASE_URL,
         'Referer': `${YTM_BASE_URL}/`,
         'X-Youtube-Client-Name': '67',
@@ -81,6 +84,35 @@ export class YouTubeMusicClient {
     });
 
     logger.info('YouTube Music InnerTube client initialized');
+  }
+
+  /**
+   * Fetch and cache visitor ID from YouTube Music
+   * This is required for InnerTube API requests
+   */
+  private async getVisitorId(): Promise<string> {
+    if (this.visitorId) {
+      return this.visitorId;
+    }
+
+    try {
+      const response = await got.get(YTM_BASE_URL);
+      const body = String(response.body);
+      const match = body.match(/ytcfg\.set\s*\(\s*({.+?})\s*\)\s*;/);
+
+      if (match && match[1]) {
+        const ytcfg = JSON.parse(match[1]);
+        this.visitorId = ytcfg.VISITOR_DATA || '';
+        logger.debug('Visitor ID fetched', { visitorId: this.visitorId });
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch visitor ID', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      this.visitorId = '';
+    }
+
+    return this.visitorId || '';
   }
 
   /**
@@ -103,6 +135,12 @@ export class YouTubeMusicClient {
     await this.rateLimiter.acquire();
 
     const headers: Record<string, string> = {};
+
+    // Add visitor ID (required for InnerTube API)
+    const visitorId = await this.getVisitorId();
+    if (visitorId) {
+      headers['X-Goog-Visitor-Id'] = visitorId;
+    }
 
     // Add OAuth Bearer token if authenticated
     if (!config.bypassAuth && tokenStore.hasActiveSession()) {
