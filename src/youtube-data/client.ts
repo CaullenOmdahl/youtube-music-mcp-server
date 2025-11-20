@@ -312,7 +312,8 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Get liked videos (user's library songs)
+   * Get liked music from YouTube Music (playlist ID: LM)
+   * This returns ONLY music liked in YouTube Music, not all YouTube videos
    */
   async getLikedVideos(maxResults: number = 50): Promise<any[]> {
     const accessToken = this.getAccessToken();
@@ -321,10 +322,12 @@ export class YouTubeDataClient {
     }
 
     try {
-      const response = await this.client.get('videos', {
+      // Use YouTube Music's "Liked Music" playlist (ID: LM)
+      // This filters to only music, not all YouTube likes
+      const response = await this.client.get('playlistItems', {
         searchParams: {
           part: 'snippet,contentDetails',
-          myRating: 'like',
+          playlistId: 'LM',
           maxResults,
         },
         headers: {
@@ -334,15 +337,15 @@ export class YouTubeDataClient {
 
       const data = response.body as any;
       return (data.items || []).map((item: any) => ({
-        videoId: item.id,
+        videoId: item.contentDetails.videoId,
         title: item.snippet.title,
-        artist: item.snippet.channelTitle,
+        artist: item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle,
         album: null,
-        duration: item.contentDetails?.duration || '',
+        duration: null,
         thumbnails: item.snippet.thumbnails || {},
       }));
     } catch (error) {
-      logger.error('Failed to get liked videos', {
+      logger.error('Failed to get liked music from YouTube Music', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
