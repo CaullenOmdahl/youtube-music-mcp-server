@@ -311,6 +311,44 @@ export class YouTubeDataClient {
     }
   }
 
+  /**
+   * Get liked videos (user's library songs)
+   */
+  async getLikedVideos(maxResults: number = 50): Promise<any[]> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('No access token available');
+    }
+
+    try {
+      const response = await this.client.get('videos', {
+        searchParams: {
+          part: 'snippet,contentDetails',
+          myRating: 'like',
+          maxResults,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = response.body as any;
+      return (data.items || []).map((item: any) => ({
+        videoId: item.id,
+        title: item.snippet.title,
+        artist: item.snippet.channelTitle,
+        album: null,
+        duration: item.contentDetails?.duration || '',
+        thumbnails: item.snippet.thumbnails || {},
+      }));
+    } catch (error) {
+      logger.error('Failed to get liked videos', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
   async close(): Promise<void> {
     logger.info('YouTube Data API client closed');
   }

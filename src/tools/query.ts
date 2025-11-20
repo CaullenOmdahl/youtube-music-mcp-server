@@ -320,7 +320,7 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
       logger.debug('get_library_songs called', { limit });
 
       try {
-        const songs = await context.ytMusic.getLibrarySongs(limit);
+        const songs = await context.ytData.getLikedVideos(limit);
 
         return {
           content: [
