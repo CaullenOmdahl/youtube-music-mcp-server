@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an enterprise-grade Model Context Protocol (MCP) server that provides YouTube Music functionality to AI agents through OAuth 2.1 authentication. Built with TypeScript using the MCP SDK, it features HTTP transport, smart playlist creation using MusicBrainz and ListenBrainz, and comprehensive rate limiting.
+This is an enterprise-grade Model Context Protocol (MCP) server that provides YouTube Music functionality to AI agents through OAuth 2.1 authentication. Built with TypeScript using the MCP SDK, it features HTTP transport, AI-powered adaptive playlist generation using Reccobeats, MusicBrainz, ListenBrainz, and Spotify APIs, and comprehensive rate limiting with batched API calls.
 
 **Key Technology Stack:**
 - TypeScript with strict type checking
@@ -62,23 +62,33 @@ smithery deploy
 │   ├── youtube-music/
 │   │   ├── client.ts         # YouTube Music API client
 │   │   └── parsers.ts        # Response parsers
+│   ├── youtube-data/
+│   │   └── client.ts         # YouTube Data API v3 client
 │   ├── musicbrainz/
 │   │   └── client.ts         # MusicBrainz API client
 │   ├── listenbrainz/
 │   │   └── client.ts         # ListenBrainz API client
-│   ├── recommendations/
-│   │   ├── engine.ts         # Recommendation engine
-│   │   └── session.ts        # Playlist session management
+│   ├── spotify/
+│   │   └── client.ts         # Spotify API client
+│   ├── reccobeats/
+│   │   └── client.ts         # Reccobeats recommendation API
+│   ├── adaptive-playlist/
+│   │   ├── types.ts          # Profile and context types
+│   │   ├── session-manager.ts # Conversation session management
+│   │   ├── recommendation-engine.ts # AI recommendation engine
+│   │   ├── song-features.ts  # Audio feature extraction
+│   │   └── scoring/          # Modular scoring system
 │   ├── tools/
 │   │   ├── query.ts          # Search and info tools (7)
 │   │   ├── playlist.ts       # Playlist CRUD tools (7)
-│   │   ├── smart-playlist.ts # Smart playlist tools (8)
+│   │   ├── adaptive-playlist.ts # Adaptive playlist tools (5)
+│   │   ├── reccobeats.ts     # Reccobeats tools (2)
 │   │   └── system.ts         # Auth/status tools (2)
 │   ├── types/
 │   │   └── index.ts          # Zod schemas and types
 │   └── utils/
 │       ├── logger.ts         # Structured logging
-│       └── rate-limiter.ts   # Rate limiting
+│       └── rate-limiter.ts   # Rate limiting with batching
 ├── smithery.yaml             # Smithery deployment config
 ├── Dockerfile                # Container build
 └── package.json
@@ -88,14 +98,18 @@ smithery deploy
 
 1. **HTTP Transport**: Uses StreamableHTTPServerTransport for MCP protocol
 2. **OAuth 2.1 with PKCE**: Proxies to Google OAuth via Smithery
-3. **Dual API Strategy**:
+3. **Multi-API Integration**:
    - **YouTube Data API v3** (authenticated): Playlist CRUD, library access with OAuth bearer tokens
-   - **YouTube Music API** (public): Search, metadata via public endpoints
+   - **YouTube Music API** (unofficial): Search, metadata via cookies/headers  
+   - **Reccobeats**: Mood/energy-based music recommendations
+   - **MusicBrainz/ListenBrainz**: Metadata enrichment and discovery
+   - **Spotify**: Audio features and genre classification
 4. **Shared Token Store**: Tokens accessible across OAuth provider and clients
-5. **Rate Limiting**: Per-session and global rate limits
-6. **Structured Logging**: All components use consistent logging
+5. **Batched API Calls**: Controlled concurrency (5 concurrent requests) with delays to respect rate limits
+6. **Rate Limiting**: 120 req/min, burst 20 req/10sec, 2000 req/hour
+7. **Structured Logging**: All components use consistent logging
 
-## MCP Tools Available (24 total)
+## MCP Tools Available (23 total)
 
 ### Query Tools (7)
 - `search_songs` - Search for songs
@@ -115,15 +129,16 @@ smithery deploy
 - `add_songs_to_playlist` - Add songs (batch)
 - `remove_songs_from_playlist` - Remove songs (batch)
 
-### Smart Playlist Tools (8)
-- `start_smart_playlist` - Start playlist session
-- `add_seed_artist` - Add artist for recommendations
-- `add_seed_track` - Add track for recommendations
-- `refine_recommendations` - Adjust parameters
-- `get_recommendations` - Generate recommendations
-- `preview_playlist` - Preview before creating
-- `create_smart_playlist` - Create on YouTube Music
-- `get_user_taste_profile` - Analyze user's taste
+### Adaptive Playlist Tools (5) - AI-Powered Playlist Generation
+- `start_playlist_conversation` - Start conversational playlist session
+- `continue_conversation` - Continue conversation, extract preferences
+- `generate_adaptive_playlist` - Generate AI-curated playlist
+- `view_profile` - View extracted user profile
+- `decode_playlist_profile` - Decode profile from playlist description
+
+### Reccobeats Tools (2) - Music Recommendation API
+- `get_audio_features` - Get valence/energy for tracks
+- `get_music_recommendations` - Get mood/seed-based recommendations
 
 ### System Tools (2)
 - `get_auth_status` - Check authentication status
@@ -139,7 +154,11 @@ smithery deploy
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | Yes | - |
 | `GOOGLE_REDIRECT_URI` | OAuth redirect URI | Yes | - |
 | `ENCRYPTION_KEY` | Base64 32-byte key | Yes | - |
-| `RATE_LIMIT_PER_MINUTE` | Rate limit per minute | No | `60` |
+| `RATE_LIMIT_PER_MINUTE` | Rate limit per minute | No | `120` |
+| `RATE_LIMIT_PER_HOUR` | Rate limit per hour | No | `2000` |
+| `BURST_LIMIT` | Max requests per 10 seconds | No | `20` |
+| `SPOTIFY_CLIENT_ID` | Spotify API Client ID | No | - |
+| `SPOTIFY_CLIENT_SECRET` | Spotify API Client Secret | No | - |
 | `PORT` | Server port | No | `8081` |
 | `BYPASS_AUTH_FOR_TESTING` | Skip OAuth for testing | No | `false` |
 

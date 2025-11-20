@@ -1,5 +1,4 @@
 import got, { Got } from 'got';
-import { CookieJar } from 'tough-cookie';
 import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { RateLimiter } from '../utils/rate-limiter.js';
@@ -21,32 +20,26 @@ const YTM_BASE_URL = 'https://music.youtube.com';
 const YTM_API_URL = 'https://music.youtube.com/youtubei/v1';
 const YTM_API_KEY = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
 
-// Context for YouTube Music API requests
+/**
+ * Generate dynamic client version based on current date (ytmusicapi format)
+ */
+function getClientVersion(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `1.${year}${month}${day}.01.00`;
+}
+
+// Context for YouTube Music InnerTube API requests
 const YTM_CONTEXT = {
   client: {
     clientName: 'WEB_REMIX',
-    clientVersion: '1.20231204.01.00',
+    clientVersion: getClientVersion(),
     hl: 'en',
     gl: 'US',
-    experimentIds: [],
-    experimentsToken: '',
-    browserName: 'Chrome',
-    browserVersion: '120.0.0.0',
-    osName: 'Windows',
-    osVersion: '10.0',
-    platform: 'DESKTOP',
-    musicAppInfo: {
-      pwaInstallabilityStatus: 'PWA_INSTALLABILITY_STATUS_UNKNOWN',
-      webDisplayMode: 'WEB_DISPLAY_MODE_BROWSER',
-      storeDigitalGoodsApiSupportStatus: {
-        playStoreDigitalGoodsApiSupportStatus:
-          'DIGITAL_GOODS_API_SUPPORT_STATUS_UNSUPPORTED',
-      },
-    },
   },
-  user: {
-    lockedSafetyMode: false,
-  },
+  user: {},
 };
 
 export interface SearchOptions {
@@ -56,11 +49,9 @@ export interface SearchOptions {
 
 export class YouTubeMusicClient {
   private client: Got;
-  private cookieJar: CookieJar;
   private rateLimiter: RateLimiter;
 
   constructor() {
-    this.cookieJar = new CookieJar();
     this.rateLimiter = new RateLimiter('youtube-music', {
       requestsPerMinute: config.rateLimitPerMinute,
       requestsPerHour: config.rateLimitPerHour,
@@ -69,7 +60,6 @@ export class YouTubeMusicClient {
 
     this.client = got.extend({
       prefixUrl: YTM_API_URL,
-      cookieJar: this.cookieJar,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': '*/*',
@@ -78,7 +68,7 @@ export class YouTubeMusicClient {
         'Origin': YTM_BASE_URL,
         'Referer': `${YTM_BASE_URL}/`,
         'X-Youtube-Client-Name': '67',
-        'X-Youtube-Client-Version': '1.20231204.01.00',
+        'X-Youtube-Client-Version': getClientVersion(),
       },
       searchParams: {
         key: YTM_API_KEY,
@@ -90,7 +80,7 @@ export class YouTubeMusicClient {
       },
     });
 
-    logger.info('YouTube Music client initialized');
+    logger.info('YouTube Music InnerTube client initialized');
   }
 
   /**
@@ -104,52 +94,7 @@ export class YouTubeMusicClient {
   }
 
   /**
-   * Initialize YouTube Music session using OAuth access token
-   * This exchanges the OAuth token for YouTube Music session cookies
-   */
-  private async initializeSession(): Promise<void> {
-    const token = tokenStore.getCurrentToken();
-    if (!token) {
-      logger.debug('No OAuth token available for session initialization');
-      return;
-    }
-
-    try {
-      // Step 1: Establish Google session with OAuth token
-      // This sets Google authentication cookies
-      await got.get('https://accounts.google.com/ServiceLogin', {
-        cookieJar: this.cookieJar,
-        headers: {
-          'Authorization': `Bearer ${token.accessToken}`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        followRedirect: true,
-      });
-
-      // Step 2: Visit YouTube Music to propagate the session
-      // Google cookies should now authenticate us with YouTube
-      await got.get(YTM_BASE_URL, {
-        cookieJar: this.cookieJar,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        followRedirect: true,
-      });
-
-      const cookies = await this.cookieJar.getCookies(YTM_BASE_URL);
-      logger.info('YouTube Music session initialized', {
-        cookieCount: cookies.length,
-        hasSID: cookies.some(c => c.key === 'SID'),
-      });
-    } catch (error) {
-      logger.warn('Failed to initialize YouTube Music session', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-
-  /**
-   * Make authenticated API request
+   * Make authenticated API request using OAuth Bearer token
    */
   private async makeRequest<T>(
     endpoint: string,
@@ -157,15 +102,16 @@ export class YouTubeMusicClient {
   ): Promise<T> {
     await this.rateLimiter.acquire();
 
-    // Initialize session with OAuth token if we have one but no cookies yet
-    if (tokenStore.hasActiveSession()) {
-      const cookies = await this.cookieJar.getCookies(YTM_BASE_URL);
-      if (cookies.length === 0) {
-        await this.initializeSession();
+    const headers: Record<string, string> = {};
+
+    // Add OAuth Bearer token if authenticated
+    if (!config.bypassAuth && tokenStore.hasActiveSession()) {
+      const token = tokenStore.getCurrentToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token.accessToken}`;
+        headers['X-Goog-Request-Time'] = String(Math.floor(Date.now() / 1000));
       }
     }
-
-    const headers: Record<string, string> = {};
 
     try {
       const response = await this.client.post<T>(endpoint, {
@@ -178,7 +124,7 @@ export class YouTubeMusicClient {
 
       return response.body;
     } catch (error) {
-      logger.error('API request failed', {
+      logger.error('InnerTube API request failed', {
         endpoint,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
