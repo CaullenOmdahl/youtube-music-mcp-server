@@ -24,6 +24,7 @@ export class RecommendationEngine {
   ) {
     // Note: context.musicBrainz should be an instance of MusicBrainzClient
     // We're passing it directly assuming the ServerContext provides the proper type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.featureExtractor = new SongFeatureExtractor(context.musicBrainz as any, db);
   }
 
@@ -57,7 +58,8 @@ export class RecommendationEngine {
     logger.debug('Extracted features', { count: tracksWithFeatures.length });
 
     // Step 3: Enrich with user-specific data
-    const enrichedTracks = await this.enrichWithUserData(tracksWithFeatures, profile.userId!);
+    const userId = profile.userId || 'default_user';
+    const enrichedTracks = await this.enrichWithUserData(tracksWithFeatures, userId);
 
     // Step 4: Score each track
     const scoredTracks = enrichedTracks.map((track) => {

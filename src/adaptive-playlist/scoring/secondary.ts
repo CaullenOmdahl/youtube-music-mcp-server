@@ -42,7 +42,7 @@ function calculateCurrentMoodAlignment(track: Track, context: Context): number {
 function calculateRegulationGoalFit(
   track: Track,
   context: Context,
-  profile: Profile
+  _profile: Profile
 ): number {
   const strategy = context.regulationStrategy;
 

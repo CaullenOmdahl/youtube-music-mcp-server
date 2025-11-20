@@ -97,6 +97,7 @@ export async function checkDatabaseHealth(): Promise<{
 
 // Query wrapper with logging
 export const db = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: async (text: string, params?: any[]) => {
     const start = Date.now();
     try {

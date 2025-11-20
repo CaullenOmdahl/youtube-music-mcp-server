@@ -277,6 +277,7 @@ class TokenStore {
         expiredRemoved: expiredCount,
         savedAt: data.savedAt,
       });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         logger.info('No existing token file found, starting fresh');

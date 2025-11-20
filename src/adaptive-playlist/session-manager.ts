@@ -1,4 +1,4 @@
-import type { ConversationSession, ConversationMessage, Profile, Database } from './types.js';
+import type { ConversationSession, Profile, Database } from './types.js';
 import { calculateConfidence } from './encoder.js';
 import { createLogger } from '../utils/logger.js';
 import { randomBytes } from 'crypto';
@@ -86,8 +86,8 @@ export class SessionManager {
   async getSession(sessionId: string): Promise<ConversationSession | null> {
     // Check cache first
     if (this.sessionCache.has(sessionId)) {
-      const cached = this.sessionCache.get(sessionId)!;
-      if (cached.expiresAt > Date.now()) {
+      const cached = this.sessionCache.get(sessionId);
+      if (cached && cached.expiresAt > Date.now()) {
         return cached;
       }
       // Expired, remove from cache

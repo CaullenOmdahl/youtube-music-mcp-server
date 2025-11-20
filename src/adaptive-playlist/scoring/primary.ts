@@ -129,7 +129,7 @@ export function calculateMUSICDimensionSimilarity(
   return 1 - avgDifference / 35;
 }
 
-function calculateTrackExposureScore(track: Track, profile: Profile): number {
+function calculateTrackExposureScore(track: Track, _profile: Profile): number {
   const playCount = track.userPlayCount || 0;
 
   // Sweet spot: 4-10 plays
@@ -155,7 +155,7 @@ function calculateTrackExposureScore(track: Track, profile: Profile): number {
   }
 }
 
-function calculateOptimalRecency(track: Track, profile: Profile): number {
+function calculateOptimalRecency(track: Track, _profile: Profile): number {
   if (!track.lastPlayedDate) {
     return 1.0; // No penalty for never played
   }

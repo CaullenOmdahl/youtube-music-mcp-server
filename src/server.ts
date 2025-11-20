@@ -33,6 +33,7 @@ export interface ServerContext {
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
   sessions: SessionManager;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any; // Database client for adaptive playlists
 }
 
@@ -369,7 +370,12 @@ export async function createServer(): Promise<Server> {
 
       if (httpServer) {
         await new Promise<void>((resolve) => {
-          httpServer!.close(() => resolve());
+          const server = httpServer;
+          if (server) {
+            server.close(() => resolve());
+          } else {
+            resolve();
+          }
         });
       }
 
