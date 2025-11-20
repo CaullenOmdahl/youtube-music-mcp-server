@@ -230,9 +230,13 @@ export class YouTubeDataClient {
       throw new Error('No access token available');
     }
 
-    try {
-      for (const videoId of videoIds) {
-        await this.client.post('playlistItems', {
+    const results: { videoId: string; success: boolean; error?: string }[] = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const videoId of videoIds) {
+      try {
+        const response = await this.client.post('playlistItems', {
           searchParams: {
             part: 'snippet',
           },
@@ -250,17 +254,51 @@ export class YouTubeDataClient {
             },
           },
         });
-      }
 
-      logger.info('Videos added to playlist', {
-        playlistId,
-        count: videoIds.length,
+        results.push({ videoId, success: true });
+        successCount++;
+        logger.debug('Video added to playlist', { playlistId, videoId });
+      } catch (error: any) {
+        failureCount++;
+        const errorMessage = error?.response?.body?.error?.message ||
+                           error?.message ||
+                           'Unknown error';
+        const errorCode = error?.response?.statusCode ||
+                         error?.response?.body?.error?.code;
+
+        results.push({
+          videoId,
+          success: false,
+          error: `${errorCode ? `[${errorCode}] ` : ''}${errorMessage}`
+        });
+
+        logger.warn('Failed to add video to playlist', {
+          playlistId,
+          videoId,
+          error: errorMessage,
+          statusCode: errorCode,
+        });
+      }
+    }
+
+    logger.info('Batch add to playlist completed', {
+      playlistId,
+      total: videoIds.length,
+      success: successCount,
+      failed: failureCount,
+    });
+
+    // If all videos failed, throw an error
+    if (failureCount === videoIds.length) {
+      const errorDetails = results.map(r => `${r.videoId}: ${r.error}`).join('; ');
+      throw new Error(`Failed to add any videos to playlist: ${errorDetails}`);
+    }
+
+    // If some failed, log warning but don't throw (partial success)
+    if (failureCount > 0) {
+      logger.warn('Some videos failed to add', {
+        failedVideos: results.filter(r => !r.success),
       });
-    } catch (error) {
-      logger.error('Failed to add videos to playlist', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw error;
     }
   }
 
