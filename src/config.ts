@@ -29,6 +29,15 @@ const ConfigSchema = z.object({
   musicBrainzRateLimit: z.number().default(1000), // 1 request per second
   musicBrainzUserAgent: z.string().default('YouTubeMusicMCPServer/3.0.0'),
 
+  // Spotify
+  spotifyClientId: z.string().min(1),
+  spotifyClientSecret: z.string().min(1),
+
+  // Database
+  databaseUrl: z.string().url().optional(),
+  databasePoolMin: z.number().default(5),
+  databasePoolMax: z.number().default(20),
+
   // Redis (optional)
   redisUrl: z.string().url().optional(),
 
@@ -63,6 +72,13 @@ function loadConfig() {
 
     musicBrainzRateLimit: parseInt(process.env['MUSICBRAINZ_RATE_LIMIT'] ?? '1000', 10),
     musicBrainzUserAgent: process.env['MUSICBRAINZ_USER_AGENT'] ?? 'YouTubeMusicMCPServer/3.0.0',
+
+    spotifyClientId: process.env['SPOTIFY_CLIENT_ID'] ?? '',
+    spotifyClientSecret: process.env['SPOTIFY_CLIENT_SECRET'] ?? '',
+
+    databaseUrl: process.env['DATABASE_URL'] || undefined,
+    databasePoolMin: parseInt(process.env['DATABASE_POOL_MIN'] ?? '5', 10),
+    databasePoolMax: parseInt(process.env['DATABASE_POOL_MAX'] ?? '20', 10),
 
     redisUrl: process.env['REDIS_URL'] || undefined,
 

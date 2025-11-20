@@ -88,8 +88,7 @@ CREATE TABLE IF NOT EXISTS user_listening_history (
 
 CREATE INDEX IF NOT EXISTS idx_user_history_user ON user_listening_history(user_id, last_played_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_history_video ON user_listening_history(video_id);
-CREATE INDEX IF NOT EXISTS idx_user_history_recent ON user_listening_history(user_id, first_played_at DESC)
-  WHERE first_played_at > CURRENT_TIMESTAMP - INTERVAL '30 days';
+CREATE INDEX IF NOT EXISTS idx_user_history_recent ON user_listening_history(user_id, first_played_at DESC);
 
 -- Materialized view for user statistics
 CREATE MATERIALIZED VIEW IF NOT EXISTS user_listening_stats AS
@@ -133,8 +132,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_active ON user_profiles(last_active_at DESC);
-CREATE INDEX IF NOT EXISTS idx_user_cache_valid ON user_profiles(cache_valid_until)
-  WHERE cache_valid_until < CURRENT_TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_user_cache_valid ON user_profiles(cache_valid_until);
 
 -- Conversation sessions
 CREATE TABLE IF NOT EXISTS conversation_sessions (
@@ -187,8 +185,7 @@ CREATE TABLE IF NOT EXISTS playlists (
 
 CREATE INDEX IF NOT EXISTS idx_playlist_user ON playlists(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_playlist_code ON playlists(profile_code);
-CREATE INDEX IF NOT EXISTS idx_playlist_recent ON playlists(created_at DESC)
-  WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days';
+CREATE INDEX IF NOT EXISTS idx_playlist_recent ON playlists(created_at DESC);
 
 -- ============================================================================
 -- MAINTENANCE FUNCTIONS

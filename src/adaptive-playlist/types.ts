@@ -49,6 +49,17 @@ export interface Profile {
   // Derived data (not in encoding, computed from history)
   familiarStyles?: StyleProfile;
   userId?: string;
+
+  // Seeds for explicit artist/track-based discovery (Smart Playlist migration)
+  seedArtists?: string[]; // Array of artist MBIDs
+  seedTracks?: { title: string; artist: string; mbid: string }[];
+
+  // Tag filtering (Smart Playlist migration)
+  preferTags?: string[]; // Tags to prefer (e.g., "ambient", "electronic")
+  avoidTags?: string[]; // Tags to avoid (e.g., "metal", "loud")
+
+  // Discovery/diversity preference (Smart Playlist migration)
+  diversity?: 'focused' | 'balanced' | 'diverse'; // focused: similar to seeds, diverse: exploratory
 }
 
 export interface MUSICDimensions {
@@ -244,8 +255,21 @@ export interface AdaptivePlaylistContext {
     getArtistTags: (mbid: string) => Promise<{ name: string; count: number }[]>;
     searchRecording: (title: string, artist?: string, limit?: number) => Promise<unknown[]>;
   };
+  spotify: {
+    searchTrack: (query: string, artist?: string) => Promise<unknown>;
+    getAudioFeatures: (trackId: string) => Promise<unknown>;
+    getAudioFeaturesBySearch: (trackName: string, artistName: string) => Promise<unknown>;
+  };
   listenBrainz?: {
     getUserListens: (userId: string, limit?: number) => Promise<unknown[]>;
+  };
+  reccobeats?: {
+    getRecommendations: (params: {
+      targetValence?: number;
+      targetEnergy?: number;
+      seedArtists?: string[];
+      limit?: number;
+    }) => Promise<unknown[]>;
   };
   db: Database;
   userId: string;

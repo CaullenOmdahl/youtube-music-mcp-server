@@ -1,4 +1,5 @@
 import type { MusicBrainzClient } from '../musicbrainz/client.js';
+import type { SpotifyClient } from '../spotify/client.js';
 import type { Database, MUSICDimensions, Track } from './types.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -49,11 +50,12 @@ const TAG_DIMENSION_MAP: Record<string, Partial<MUSICDimensions>> = {
 };
 
 /**
- * Song feature extractor - integrates with MusicBrainz for tag-based feature extraction
+ * Song feature extractor - integrates with MusicBrainz and Spotify for comprehensive feature extraction
  */
 export class SongFeatureExtractor {
   constructor(
     private musicBrainz: MusicBrainzClient,
+    private spotify: SpotifyClient,
     private db: Database
   ) {}
 
@@ -104,40 +106,157 @@ export class SongFeatureExtractor {
       // Extract MUSIC dimensions from tags
       const dimensions = this.extractMUSICDimensions(allTags);
 
-      // Extract other features
+      // Get Spotify audio features for more accurate data
+      const spotifyFeatures = await this.spotify.getAudioFeaturesBySearch(title, artist);
+
+      // Extract other features, preferring Spotify data when available
       const features: Track = {
         videoId,
         title,
         artist,
         releaseYear: releaseYear || 2020,
-        dimensions,
-        tempo: this.estimateTempoFromTags(tagNames),
-        energy: this.estimateEnergyFromTags(tagNames),
-        complexity: this.estimateComplexityFromTags(tagNames),
-        mode: this.estimateModeFromTags(tagNames),
+        dimensions: spotifyFeatures
+          ? this.enhanceDimensionsWithSpotify(dimensions, spotifyFeatures)
+          : dimensions,
+        tempo: spotifyFeatures
+          ? this.normalizeSpotifyTempo(spotifyFeatures.tempo)
+          : this.estimateTempoFromTags(tagNames),
+        energy: spotifyFeatures ? spotifyFeatures.energy : this.estimateEnergyFromTags(tagNames),
+        complexity: spotifyFeatures
+          ? this.calculateComplexityFromSpotify(spotifyFeatures)
+          : this.estimateComplexityFromTags(tagNames),
+        mode: spotifyFeatures
+          ? this.normalizeSpotifyMode(spotifyFeatures.mode)
+          : this.estimateModeFromTags(tagNames),
         predictability: this.estimatePredictabilityFromTags(tagNames),
         consonance: this.estimateConsonanceFromTags(tagNames),
-        valence: this.estimateValenceFromTags(tagNames),
-        arousal: this.estimateArousalFromTags(tagNames),
+        valence: spotifyFeatures
+          ? this.normalizeSpotifyValence(spotifyFeatures.valence)
+          : this.estimateValenceFromTags(tagNames),
+        arousal: spotifyFeatures
+          ? this.normalizeSpotifyEnergy(spotifyFeatures.energy)
+          : this.estimateArousalFromTags(tagNames),
         genres: this.extractGenres(allTags),
         tags: tagNames,
         popularity: this.estimatePopularity(allTags),
         mainstream: this.isMainstream(allTags),
         isTrending: false,
-        hasLyrics: !tagNames.includes('instrumental'),
+        hasLyrics: spotifyFeatures
+          ? spotifyFeatures.instrumentalness < 0.5
+          : !tagNames.includes('instrumental'),
         userPlayCount: 0,
         isNewArtist: true,
         artistFamiliarity: 0,
       };
 
-      // Cache in database
-      await this.cacheFeatures(features, 'musicbrainz', 0.8);
+      // Cache in database with higher confidence if Spotify data available
+      const source = spotifyFeatures ? 'musicbrainz+spotify' : 'musicbrainz';
+      const confidence = spotifyFeatures ? 0.95 : 0.8;
+      await this.cacheFeatures(features, source, confidence);
 
       return features;
     } catch (error) {
       logger.error('Feature extraction failed', { error, videoId, title, artist });
       return this.createProxyFeatures(videoId, title, artist, releaseYear || 2020);
     }
+  }
+
+  /**
+   * Enhance MUSIC dimensions with Spotify audio features
+   */
+  private enhanceDimensionsWithSpotify(
+    dimensions: MUSICDimensions,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spotify: any
+  ): MUSICDimensions {
+    // Spotify's audio features help refine MUSIC dimensions
+    const enhanced = { ...dimensions };
+
+    // Mellow: Higher acousticness and lower energy suggests mellow
+    if (spotify.acousticness > 0.6 && spotify.energy < 0.5) {
+      enhanced.mellow = Math.min(35, enhanced.mellow + Math.round((spotify.acousticness - 0.5) * 20));
+    }
+
+    // Sophisticated: Higher instrumentalness and lower valence suggests sophistication
+    if (spotify.instrumentalness > 0.5) {
+      enhanced.sophisticated = Math.min(35, enhanced.sophisticated + Math.round(spotify.instrumentalness * 10));
+    }
+
+    // Intense: Higher energy and loudness suggests intensity
+    if (spotify.energy > 0.7) {
+      enhanced.intense = Math.min(35, enhanced.intense + Math.round((spotify.energy - 0.5) * 20));
+    }
+
+    // Contemporary: Higher danceability suggests contemporary
+    if (spotify.danceability > 0.6) {
+      enhanced.contemporary = Math.min(35, enhanced.contemporary + Math.round((spotify.danceability - 0.5) * 15));
+    }
+
+    // Unpretentious: Lower instrumentalness and higher valence suggests unpretentious
+    if (spotify.instrumentalness < 0.3 && spotify.valence > 0.5) {
+      enhanced.unpretentious = Math.min(35, enhanced.unpretentious + 5);
+    }
+
+    return enhanced;
+  }
+
+  /**
+   * Normalize Spotify tempo (BPM) to 0-35 scale
+   */
+  private normalizeSpotifyTempo(bpm: number): number {
+    // Typical range: 60-180 BPM
+    // Map to 0-35 scale
+    const normalized = ((bpm - 60) / (180 - 60)) * 35;
+    return Math.max(0, Math.min(35, Math.round(normalized)));
+  }
+
+  /**
+   * Normalize Spotify mode (0=minor, 1=major) to 0-35 scale
+   */
+  private normalizeSpotifyMode(mode: number): number {
+    // Spotify: 0 = minor, 1 = major
+    // Map to 0-35 scale: 0=minor, 17.5=neutral, 35=major
+    return mode === 1 ? 30 : 5;
+  }
+
+  /**
+   * Normalize Spotify valence (0-1) to 0-35 scale
+   */
+  private normalizeSpotifyValence(valence: number): number {
+    return Math.round(valence * 35);
+  }
+
+  /**
+   * Normalize Spotify energy (0-1) to 0-35 scale for arousal
+   */
+  private normalizeSpotifyEnergy(energy: number): number {
+    return Math.round(energy * 35);
+  }
+
+  /**
+   * Calculate complexity from Spotify features
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private calculateComplexityFromSpotify(spotify: any): number {
+    // Complexity correlates with:
+    // - Lower danceability (less predictable)
+    // - Higher instrumentalness (more musical complexity)
+    // - Non-standard time signature
+
+    let complexity = 0.5;
+
+    // Instrumentalness contributes to complexity
+    complexity += spotify.instrumentalness * 0.3;
+
+    // Lower danceability suggests more complex rhythms
+    complexity += (1 - spotify.danceability) * 0.2;
+
+    // Non-4/4 time signatures add complexity
+    if (spotify.time_signature !== 4) {
+      complexity += 0.2;
+    }
+
+    return Math.max(0, Math.min(1, complexity));
   }
 
   /**
