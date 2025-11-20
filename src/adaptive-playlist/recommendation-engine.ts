@@ -156,37 +156,55 @@ export class RecommendationEngine {
           logger.debug('Reccobeats returned results', { count: reccobeatsResults.length });
 
           // Search YouTube Music for each Reccobeats recommendation
-          for (const track of reccobeatsResults.slice(0, 30)) {
-            try {
-              const { title, artist } = track as { title: string; artist: string };
-              const searchQuery = `${title} ${artist}`;
-              const searchResult = await this.context.ytMusic.search(searchQuery, {
-                filter: 'songs',
-                limit: 3,
-              });
+          // BATCHING OPTIMIZATION: Use controlled concurrency instead of sequential
+          // Process in batches of 5 to respect burst limit (10 req/10sec)
+          const tracksToProcess = Math.min(reccobeatsResults.length, 20);
+          const batchSize = 5;
 
-              const songs = (searchResult as { songs?: unknown[] })?.songs || [];
-              if (songs.length > 0) {
-                const firstSong = songs[0] as {
-                  videoId: string;
-                  title: string;
-                  artists: { name: string }[];
-                  year?: number;
-                };
+          for (let i = 0; i < tracksToProcess; i += batchSize) {
+            const batch = reccobeatsResults.slice(i, i + batchSize);
 
-                candidates.push({
-                  videoId: firstSong.videoId,
-                  title: firstSong.title,
-                  artist: firstSong.artists?.[0]?.name || 'Unknown',
-                  year: firstSong.year,
+            // Process batch concurrently with Promise.allSettled
+            const batchResults = await Promise.allSettled(
+              batch.map(async (track) => {
+                const { title, artist } = track as { title: string; artist: string };
+                const searchQuery = `${title} ${artist}`;
+
+                const searchResult = await this.context.ytMusic.search(searchQuery, {
+                  filter: 'songs',
+                  limit: 3,
                 });
+
+                const songs = (searchResult as { songs?: unknown[] })?.songs || [];
+                if (songs.length > 0) {
+                  const firstSong = songs[0] as {
+                    videoId: string;
+                    title: string;
+                    artists: { name: string }[];
+                    year?: number;
+                  };
+
+                  return {
+                    videoId: firstSong.videoId,
+                    title: firstSong.title,
+                    artist: firstSong.artists?.[0]?.name || 'Unknown',
+                    year: firstSong.year,
+                  };
+                }
+                return null;
+              })
+            );
+
+            // Collect successful results
+            for (const result of batchResults) {
+              if (result.status === 'fulfilled' && result.value) {
+                candidates.push(result.value);
               }
-            } catch (error) {
-              const { title, artist } = track as { title: string; artist: string };
-              logger.debug('Failed to find Reccobeats recommendation on YouTube Music', {
-                track: title,
-                artist: artist,
-              });
+            }
+
+            // Add delay between batches to respect rate limits
+            if (i + batchSize < tracksToProcess) {
+              await new Promise(resolve => setTimeout(resolve, 300));
             }
           }
 

@@ -12,7 +12,7 @@ export class SessionManager {
   // In-memory cache of active sessions
   private sessionCache = new Map<string, ConversationSession>();
 
-  constructor(private db: Database) {}
+  constructor(private db: Database) { }
 
   /**
    * Create a new conversation session
@@ -256,9 +256,10 @@ export class SessionManager {
 
   /**
    * Check if session is ready for playlist generation
+   * Ready when: confidence >= 21 OR at least 5 questions asked
    */
   isReadyForPlaylist(session: ConversationSession): boolean {
-    return session.questionsAsked >= 5 && session.confidence >= 21;
+    return session.confidence >= 21 || session.questionsAsked >= 5;
   }
 
   /**
