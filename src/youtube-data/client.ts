@@ -407,19 +407,31 @@ export class YouTubeDataClient {
       }
     }
 
-    // Then enrich with YouTube Music metadata (album, artists, year, etc.)
+    // Then enrich with YouTube Music metadata (album, artists, year, explicit)
     // Note: YouTube Music API doesn't support batch requests, so we fetch individually
     if (this.ytMusicClient) {
       for (const videoId of videoIds) {
         try {
           const song = await this.ytMusicClient.getSong(videoId);
           const existing = enrichedData.get(videoId) || {};
+
+          // Get explicit flag by searching (only if title and artist available)
+          let explicit: boolean | undefined;
+          if (song.title && song.artists && song.artists.length > 0 && song.artists[0]) {
+            const artistName = song.artists[0].name;
+            explicit = await this.ytMusicClient.getExplicitFlag(
+              videoId,
+              song.title,
+              artistName
+            );
+          }
+
           enrichedData.set(videoId, {
             ...existing,
             album: song.album,
             artists: song.artists,
             year: song.year,
-            explicit: song.explicit,
+            explicit,
           });
         } catch (error) {
           // YouTube Music API call failed, keep the data we have

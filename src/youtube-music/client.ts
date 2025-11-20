@@ -241,6 +241,77 @@ export class YouTubeMusicClient {
   }
 
   /**
+   * Get explicit flag for a song by searching
+   * Returns true if explicit, false if not, undefined if unable to determine
+   * Only returns a value if the search result matches the videoId
+   */
+  async getExplicitFlag(
+    videoId: string,
+    title: string,
+    artist: string
+  ): Promise<boolean | undefined> {
+    try {
+      logger.debug('Checking explicit flag', { videoId, title, artist });
+
+      // Search for the song by title and artist
+      const searchQuery = `${title} ${artist}`;
+      const response = await this.makeRequest<unknown>('search', {
+        query: searchQuery,
+        params: 'EgWKAQIIAWoMEAMQBBAJEAoQBRAQ', // songs filter
+      });
+
+      // Navigate to search results
+      const contents =
+        (response as any)?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]
+          ?.tabRenderer?.content?.sectionListRenderer?.contents;
+
+      if (!Array.isArray(contents)) {
+        return undefined;
+      }
+
+      // Find the first song result
+      for (const section of contents) {
+        const items = section?.musicShelfRenderer?.contents;
+        if (Array.isArray(items) && items.length > 0) {
+          const firstResult = items[0].musicResponsiveListItemRenderer;
+
+          if (!firstResult) continue;
+
+          // Check if the videoId matches (only trust explicit flag if it's the same song)
+          const resultVideoId = firstResult.playlistItemData?.videoId;
+          if (resultVideoId !== videoId) {
+            logger.debug('Search result videoId mismatch', {
+              expected: videoId,
+              got: resultVideoId,
+            });
+            return undefined;
+          }
+
+          // Check for explicit badge
+          const badges = firstResult.badges;
+          if (Array.isArray(badges)) {
+            for (const badge of badges) {
+              const iconType =
+                badge.musicInlineBadgeRenderer?.icon?.iconType;
+              if (iconType === 'MUSIC_EXPLICIT_BADGE') {
+                return true;
+              }
+            }
+          }
+
+          // If we found the matching song but no explicit badge, it's not explicit
+          return false;
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      logger.debug('Failed to get explicit flag', { error });
+      return undefined;
+    }
+  }
+
+  /**
    * Get album details with tracks
    */
   async getAlbum(browseId: string): Promise<Album & { tracks: Song[] }> {
