@@ -562,11 +562,11 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
           };
         }
 
-        // Create the playlist
-        const playlistId = await context.ytMusic.createPlaylist(
+        // Create the playlist using YouTube Data API (OAuth)
+        const playlistId = await context.ytData.createPlaylist(
           name,
-          description,
-          privacy
+          description ?? '',
+          privacy.toLowerCase() as 'private' | 'public' | 'unlisted'
         );
 
         // Add all tracks
@@ -575,7 +575,7 @@ export function registerSmartPlaylistTools(server: McpServer, context: ServerCon
           .filter((id): id is string => !!id);
 
         if (videoIds.length > 0) {
-          await context.ytMusic.addPlaylistItems(playlistId, videoIds);
+          await context.ytData.addToPlaylist(playlistId, videoIds);
         }
 
         // Clean up session
