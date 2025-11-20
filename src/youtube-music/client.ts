@@ -189,9 +189,19 @@ export class YouTubeMusicClient {
 
       return response.body;
     } catch (error) {
+      // Try to extract error response body for better debugging
+      let errorBody = 'No response body';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const httpError = error as { response?: { body?: unknown } };
+        if (httpError.response?.body) {
+          errorBody = JSON.stringify(httpError.response.body);
+        }
+      }
+
       logger.error('InnerTube API request failed', {
         endpoint,
         error: error instanceof Error ? error.message : 'Unknown error',
+        responseBody: errorBody,
       });
       throw error;
     }
