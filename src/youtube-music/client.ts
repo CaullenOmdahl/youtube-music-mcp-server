@@ -32,12 +32,11 @@ function getClientVersion(): string {
 }
 
 // Context for YouTube Music InnerTube API requests
+// Match ytmusicapi's minimal context structure exactly
 const YTM_CONTEXT = {
   client: {
     clientName: 'WEB_REMIX',
     clientVersion: getClientVersion(),
-    hl: 'en',
-    gl: 'US',
   },
   user: {},
 };
