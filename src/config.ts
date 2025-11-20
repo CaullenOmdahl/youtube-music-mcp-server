@@ -35,6 +35,9 @@ const ConfigSchema = z.object({
   // Session
   sessionTtl: z.number().default(3600), // 1 hour in seconds
 
+  // Token Storage
+  tokenStoragePath: z.string().default('/data/tokens.json'),
+
   // Bypass auth for testing
   bypassAuth: z.boolean().default(false),
 });
@@ -64,6 +67,8 @@ function loadConfig() {
     redisUrl: process.env['REDIS_URL'] || undefined,
 
     sessionTtl: parseInt(process.env['SESSION_TTL'] ?? '3600', 10),
+
+    tokenStoragePath: process.env['TOKEN_STORAGE_PATH'] ?? '/data/tokens.json',
 
     bypassAuth: process.env['BYPASS_AUTH_FOR_TESTING'] === 'true',
   };

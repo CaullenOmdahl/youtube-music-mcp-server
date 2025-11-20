@@ -7,6 +7,11 @@ startCommand = "node dist/railway.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
+# Persistent volume for token storage
+[[deploy.volumes]]
+mountPath = "/data"
+
 [env]
 PORT = "8081"
 NODE_ENV = "production"
+TOKEN_STORAGE_PATH = "/data/tokens.json"
