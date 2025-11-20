@@ -66,14 +66,16 @@ export class YouTubeMusicClient {
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en-US,en;q=0.9',
         'Content-Type': 'application/json',
+        'Content-Encoding': 'gzip',
         'Origin': YTM_BASE_URL,
         'Referer': `${YTM_BASE_URL}/`,
         'X-Youtube-Client-Name': '67',
         'X-Youtube-Client-Version': getClientVersion(),
       },
       searchParams: {
-        key: YTM_API_KEY,
-        prettyPrint: 'false',
+        // When using OAuth Bearer token, only use alt=json (no API key)
+        // API key is only used for unauthenticated/browser cookie auth
+        alt: 'json',
       },
       responseType: 'json',
       timeout: {
