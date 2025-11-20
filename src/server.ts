@@ -13,6 +13,7 @@ import { registerQueryTools } from './tools/query.js';
 import { registerPlaylistTools } from './tools/playlist.js';
 import { registerSmartPlaylistTools } from './tools/smart-playlist.js';
 import { registerSystemTools } from './tools/system.js';
+import { registerAdaptivePlaylistTools } from './tools/adaptive-playlist.js';
 import { YouTubeMusicClient } from './youtube-music/client.js';
 import { YouTubeDataClient } from './youtube-data/client.js';
 import { MusicBrainzClient } from './musicbrainz/client.js';
@@ -21,6 +22,7 @@ import { RecommendationEngine } from './recommendations/engine.js';
 import { SessionManager } from './recommendations/session.js';
 import { oauth } from './auth/smithery-oauth-provider.js';
 import { tokenStore } from './auth/token-store.js';
+import { db } from './database/client.js';
 
 const logger = createLogger('server');
 
@@ -31,6 +33,7 @@ export interface ServerContext {
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
   sessions: SessionManager;
+  db: any; // Database client for adaptive playlists
 }
 
 export interface Server {
@@ -65,15 +68,17 @@ export async function createServer(): Promise<Server> {
     listenBrainz,
     recommendations,
     sessions,
+    db,
   };
 
   // Register all MCP tools
   registerQueryTools(mcpServer, context);
   registerPlaylistTools(mcpServer, context);
   registerSmartPlaylistTools(mcpServer, context);
+  registerAdaptivePlaylistTools(mcpServer, context);
   registerSystemTools(mcpServer, context);
 
-  logger.info('MCP tools registered');
+  logger.info('MCP tools registered (including adaptive playlists)');
 
   // Create Express app for HTTP endpoints
   const app: Express = express();
