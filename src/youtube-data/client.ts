@@ -274,6 +274,43 @@ export class YouTubeDataClient {
     }
   }
 
+  /**
+   * Get playlist items (songs in a playlist)
+   */
+  async getPlaylistItems(playlistId: string, maxResults: number = 50): Promise<any[]> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('No access token available');
+    }
+
+    try {
+      const response = await this.client.get('playlistItems', {
+        searchParams: {
+          part: 'snippet,contentDetails',
+          playlistId,
+          maxResults,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = response.body as any;
+      return (data.items || []).map((item: any) => ({
+        playlistItemId: item.id,
+        videoId: item.contentDetails.videoId,
+        title: item.snippet.title,
+        artist: item.snippet.videoOwnerChannelTitle,
+        position: item.snippet.position,
+      }));
+    } catch (error) {
+      logger.error('Failed to get playlist items', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
   async close(): Promise<void> {
     logger.info('YouTube Data API client closed');
   }

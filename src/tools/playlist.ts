@@ -87,17 +87,18 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       logger.debug('get_playlist_details called', { playlist_id, limit });
 
       try {
-        const playlist = await context.ytMusic.getPlaylist(playlist_id, limit);
+        const items = await context.ytData.getPlaylistItems(playlist_id, limit);
 
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
-                playlist,
+                playlistId: playlist_id,
+                tracks: items,
                 metadata: {
-                  totalTracks: playlist.trackCount ?? 0,
-                  returned: playlist.tracks?.length ?? 0,
+                  returned: items.length,
+                  limit,
                 },
               }, null, 2),
             },
