@@ -45,7 +45,7 @@ export default function createServer({ auth }: { auth: AuthInfo }) {
 
   // Initialize clients
   const ytMusic = new YouTubeMusicClient();
-  const ytData = new YouTubeDataClient();
+  const ytData = new YouTubeDataClient(ytMusic); // Pass ytMusic for enrichment
   const musicBrainz = new MusicBrainzClient();
   const listenBrainz = new ListenBrainzClient();
   const sessions = new SessionManager();

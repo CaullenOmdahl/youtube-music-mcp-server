@@ -2,6 +2,7 @@ import got, { Got } from 'got';
 import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { tokenStore } from '../auth/token-store.js';
+import type { YouTubeMusicClient } from '../youtube-music/client.js';
 
 const logger = createLogger('youtube-data-api');
 
@@ -22,8 +23,9 @@ export interface Playlist {
  */
 export class YouTubeDataClient {
   private client: Got;
+  private ytMusicClient?: YouTubeMusicClient;
 
-  constructor() {
+  constructor(ytMusicClient?: YouTubeMusicClient) {
     this.client = got.extend({
       prefixUrl: YT_DATA_API_BASE,
       responseType: 'json',
@@ -32,7 +34,10 @@ export class YouTubeDataClient {
       },
     });
 
-    logger.info('YouTube Data API client initialized');
+    this.ytMusicClient = ytMusicClient;
+    logger.info('YouTube Data API client initialized', {
+      withMusicEnrichment: !!ytMusicClient,
+    });
   }
 
   /**
@@ -345,11 +350,16 @@ export class YouTubeDataClient {
 
       return finalItems.map(item => {
         const enrichment = enrichedData.get(item.videoId);
-        return {
-          ...item,
-          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : null,
-          durationSeconds: enrichment?.durationSeconds || null,
-        };
+        const { thumbnails, ...itemWithoutThumbnails } = item;
+        return this.cleanObject({
+          ...itemWithoutThumbnails,
+          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : undefined,
+          durationSeconds: enrichment?.durationSeconds,
+          album: enrichment?.album,
+          artists: enrichment?.artists,
+          year: enrichment?.year,
+          explicit: enrichment?.explicit,
+        });
       });
     } catch (error) {
       logger.error('Failed to get playlist items', {
@@ -360,8 +370,8 @@ export class YouTubeDataClient {
   }
 
   /**
-   * Enrich video data with additional details (duration, category, etc.)
-   * Fetches up to 50 videos per API call
+   * Enrich video data with YouTube Music metadata (album, artists, etc.)
+   * Fetches detailed song information from YouTube Music API
    */
   private async enrichVideoData(videoIds: string[]): Promise<Map<string, any>> {
     const accessToken = this.getAccessToken();
@@ -371,14 +381,14 @@ export class YouTubeDataClient {
 
     const enrichedData = new Map<string, any>();
 
-    // Process in batches of 50 (API limit)
+    // First get duration from YouTube Data API in batches of 50
     for (let i = 0; i < videoIds.length; i += 50) {
       const batch = videoIds.slice(i, i + 50);
 
       try {
         const response = await this.client.get('videos', {
           searchParams: {
-            part: 'contentDetails,snippet',
+            part: 'contentDetails',
             id: batch.join(','),
           },
           headers: {
@@ -389,17 +399,45 @@ export class YouTubeDataClient {
         const data = response.body as any;
         (data.items || []).forEach((item: any) => {
           enrichedData.set(item.id, {
-            duration: item.contentDetails?.duration || null,
             durationSeconds: this.parseDuration(item.contentDetails?.duration),
-            description: item.snippet?.description || '',
           });
         });
       } catch (error) {
-        logger.warn('Failed to enrich video batch', { error, batchSize: batch.length });
+        logger.warn('Failed to get duration data', { error, batchSize: batch.length });
+      }
+    }
+
+    // Then enrich with YouTube Music metadata (album, artists, year, etc.)
+    // Note: YouTube Music API doesn't support batch requests, so we fetch individually
+    if (this.ytMusicClient) {
+      for (const videoId of videoIds) {
+        try {
+          const song = await this.ytMusicClient.getSong(videoId);
+          const existing = enrichedData.get(videoId) || {};
+          enrichedData.set(videoId, {
+            ...existing,
+            album: song.album,
+            artists: song.artists,
+            year: song.year,
+            explicit: song.explicit,
+          });
+        } catch (error) {
+          // YouTube Music API call failed, keep the data we have
+          logger.debug('Failed to get YouTube Music metadata', { videoId });
+        }
       }
     }
 
     return enrichedData;
+  }
+
+  /**
+   * Remove null/undefined values from object
+   */
+  private cleanObject(obj: any): any {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([_, v]) => v != null)
+    );
   }
 
   /**
@@ -489,11 +527,16 @@ export class YouTubeDataClient {
 
       return finalSongs.map(song => {
         const enrichment = enrichedData.get(song.videoId);
-        return {
-          ...song,
-          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : null,
-          durationSeconds: enrichment?.durationSeconds || null,
-        };
+        const { thumbnails, ...songWithoutThumbnails } = song;
+        return this.cleanObject({
+          ...songWithoutThumbnails,
+          duration: enrichment ? this.formatDuration(enrichment.durationSeconds) : undefined,
+          durationSeconds: enrichment?.durationSeconds,
+          album: enrichment?.album,
+          artists: enrichment?.artists,
+          year: enrichment?.year,
+          explicit: enrichment?.explicit,
+        });
       });
     } catch (error) {
       logger.error('Failed to get liked music from YouTube Music', {
