@@ -29,14 +29,20 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       logger.debug('get_playlists called', { limit });
 
       try {
-        const playlists = await context.ytMusic.getLibraryPlaylists(limit);
+        const playlists = await context.ytData.getPlaylists(limit);
 
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
-                playlists,
+                playlists: playlists.map(p => ({
+                  id: p.id,
+                  name: p.title,
+                  description: p.description,
+                  privacy: p.privacy,
+                  trackCount: p.videoCount,
+                })),
                 metadata: {
                   returned: playlists.length,
                   limit,
@@ -135,10 +141,10 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       logger.debug('create_playlist called', { name, privacy });
 
       try {
-        const playlistId = await context.ytMusic.createPlaylist(
+        const playlistId = await context.ytData.createPlaylist(
           name,
           description,
-          privacy
+          privacy.toLowerCase() as 'private' | 'public' | 'unlisted'
         );
 
         return {
@@ -193,10 +199,10 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       logger.debug('edit_playlist called', { playlist_id, name, privacy });
 
       try {
-        await context.ytMusic.editPlaylist(playlist_id, {
-          name,
+        await context.ytData.updatePlaylist(playlist_id, {
+          title: name,
           description,
-          privacyStatus: privacy,
+          privacy: privacy?.toLowerCase() as 'private' | 'public' | 'unlisted' | undefined,
         });
 
         return {
@@ -247,7 +253,7 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       logger.debug('delete_playlist called', { playlist_id });
 
       try {
-        await context.ytMusic.deletePlaylist(playlist_id);
+        await context.ytData.deletePlaylist(playlist_id);
 
         return {
           content: [
@@ -300,7 +306,7 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       });
 
       try {
-        await context.ytMusic.addPlaylistItems(playlist_id, video_ids);
+        await context.ytData.addToPlaylist(playlist_id, video_ids);
 
         return {
           content: [
@@ -355,7 +361,7 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
       });
 
       try {
-        await context.ytMusic.removePlaylistItems(playlist_id, set_video_ids);
+        await context.ytData.removeFromPlaylist(set_video_ids);
 
         return {
           content: [

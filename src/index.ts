@@ -8,6 +8,7 @@ import { registerPlaylistTools } from './tools/playlist.js';
 import { registerSmartPlaylistTools } from './tools/smart-playlist.js';
 import { registerSystemTools } from './tools/system.js';
 import { YouTubeMusicClient } from './youtube-music/client.js';
+import { YouTubeDataClient } from './youtube-data/client.js';
 import { MusicBrainzClient } from './musicbrainz/client.js';
 import { ListenBrainzClient } from './listenbrainz/client.js';
 import { RecommendationEngine } from './recommendations/engine.js';
@@ -18,6 +19,7 @@ const logger = createLogger('main');
 
 export interface ServerContext {
   ytMusic: YouTubeMusicClient;
+  ytData: YouTubeDataClient;
   musicBrainz: MusicBrainzClient;
   listenBrainz: ListenBrainzClient;
   recommendations: RecommendationEngine;
@@ -43,6 +45,7 @@ export default function createServer({ auth }: { auth: AuthInfo }) {
 
   // Initialize clients
   const ytMusic = new YouTubeMusicClient();
+  const ytData = new YouTubeDataClient();
   const musicBrainz = new MusicBrainzClient();
   const listenBrainz = new ListenBrainzClient();
   const sessions = new SessionManager();
@@ -55,6 +58,7 @@ export default function createServer({ auth }: { auth: AuthInfo }) {
   // Create context for tools
   const context: ServerContext = {
     ytMusic,
+    ytData,
     musicBrainz,
     listenBrainz,
     recommendations,
