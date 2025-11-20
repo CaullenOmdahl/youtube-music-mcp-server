@@ -57,7 +57,7 @@ BYPASS_AUTH_FOR_TESTING=true npm run dev
 - `get_song_info` - Get detailed song information
 - `get_album_info` - Get album with all tracks
 - `get_artist_info` - Get artist with top songs
-- `get_library_songs` - Get user's liked songs
+- `get_library_songs` - Get user's liked music (YouTube Music only, filters out non-music videos)
 
 ### Playlist CRUD
 - `get_playlists` - Get user's playlists

@@ -88,9 +88,12 @@ smithery deploy
 
 1. **HTTP Transport**: Uses StreamableHTTPServerTransport for MCP protocol
 2. **OAuth 2.1 with PKCE**: Proxies to Google OAuth via Smithery
-3. **Shared Token Store**: Tokens accessible across OAuth provider and clients
-4. **Rate Limiting**: Per-session and global rate limits
-5. **Structured Logging**: All components use consistent logging
+3. **Dual API Strategy**:
+   - **YouTube Data API v3** (authenticated): Playlist CRUD, library access with OAuth bearer tokens
+   - **YouTube Music API** (public): Search, metadata via public endpoints
+4. **Shared Token Store**: Tokens accessible across OAuth provider and clients
+5. **Rate Limiting**: Per-session and global rate limits
+6. **Structured Logging**: All components use consistent logging
 
 ## MCP Tools Available (24 total)
 
@@ -101,7 +104,7 @@ smithery deploy
 - `get_song_info` - Get song details
 - `get_album_info` - Get album with tracks
 - `get_artist_info` - Get artist with top songs
-- `get_library_songs` - Get user's liked songs
+- `get_library_songs` - Get user's liked music from YouTube Music (uses LM playlist, music only)
 
 ### Playlist Tools (7)
 - `get_playlists` - Get user's playlists
