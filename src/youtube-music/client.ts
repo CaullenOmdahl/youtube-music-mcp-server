@@ -18,7 +18,8 @@ const logger = createLogger('youtube-music-client');
 // YouTube Music API constants
 const YTM_BASE_URL = 'https://music.youtube.com';
 const YTM_API_URL = 'https://music.youtube.com/youtubei/v1';
-const YTM_API_KEY = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+// Public API key for unauthenticated requests (not used with OAuth)
+const YTM_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 /**
  * Generate dynamic client version based on current date (ytmusicapi format)
