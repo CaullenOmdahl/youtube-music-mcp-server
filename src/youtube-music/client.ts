@@ -18,8 +18,8 @@ const logger = createLogger('youtube-music-client');
 // YouTube Music API constants
 const YTM_BASE_URL = 'https://music.youtube.com';
 const YTM_API_URL = 'https://music.youtube.com/youtubei/v1';
-// Public API key for unauthenticated requests (not used with OAuth)
-const YTM_API_KEY = process.env.YOUTUBE_API_KEY || '';
+// Public API key for InnerTube API requests (same key used by ytmusicapi)
+const YTM_API_KEY = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
 
 /**
  * Generate dynamic client version based on current date (ytmusicapi format)
@@ -73,9 +73,9 @@ export class YouTubeMusicClient {
         'X-Youtube-Client-Version': getClientVersion(),
       },
       searchParams: {
-        // When using OAuth Bearer token, only use alt=json (no API key)
-        // API key is only used for unauthenticated/browser cookie auth
-        alt: 'json',
+        // Use API key for InnerTube API (this is how the original working implementation did it)
+        key: YTM_API_KEY,
+        prettyPrint: 'false',
       },
       responseType: 'json',
       timeout: {
@@ -149,7 +149,9 @@ export class YouTubeMusicClient {
   }
 
   /**
-   * Make authenticated API request using OAuth Bearer token
+   * Make API request to YouTube Music InnerTube API
+   * Uses API key authentication (not OAuth Bearer tokens)
+   * OAuth is only used for MCP client authentication, not InnerTube API
    */
   private async makeRequest<T>(
     endpoint: string,
@@ -157,27 +159,9 @@ export class YouTubeMusicClient {
   ): Promise<T> {
     await this.rateLimiter.acquire();
 
+    // InnerTube API uses API key, not OAuth Bearer tokens
+    // The original working implementation did not use OAuth for these requests
     const headers: Record<string, string> = {};
-
-    // Add visitor ID (required for InnerTube API)
-    const visitorId = await this.getVisitorId();
-    logger.info('Adding visitor ID to request', {
-      endpoint,
-      visitorId,
-      hasVisitorId: !!visitorId
-    });
-    if (visitorId) {
-      headers['X-Goog-Visitor-Id'] = visitorId;
-    }
-
-    // Add OAuth Bearer token if authenticated
-    if (!config.bypassAuth && tokenStore.hasActiveSession()) {
-      const token = tokenStore.getCurrentToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token.accessToken}`;
-        headers['X-Goog-Request-Time'] = String(Math.floor(Date.now() / 1000));
-      }
-    }
 
     try {
       const response = await this.client.post<T>(endpoint, {
