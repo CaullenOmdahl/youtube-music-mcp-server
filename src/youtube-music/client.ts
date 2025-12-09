@@ -224,14 +224,18 @@ export class YouTubeMusicClient {
     logger.debug('Searching', { query, filter, limit });
 
     // Map filter to YouTube Music params
+    // These params are generated from ytmusicapi's get_search_params function:
+    // param1 = "EgWKAQ" (filtered_param1)
+    // param2 = filter-specific (II=songs, IQ=videos, IY=albums, Ig=artists, Io=playlists)
+    // param3 = "AWoMEA4QChADEAQQCRAF" (default, not ignoring spelling, no scope)
     const params: Record<string, unknown> = {};
     if (filter) {
       const filterMap: Record<string, string> = {
-        songs: 'EgWKAQIIAWoMEAMQBBAJEAoQBRAQ',
-        videos: 'EgWKAQIQAWoMEAMQBBAJEAoQBRAQ',
-        albums: 'EgWKAQIYAWoMEAMQBBAJEAoQBRAQ',
-        artists: 'EgWKAQIgAWoMEAMQBBAJEAoQBRAQ',
-        playlists: 'EgWKAQIoAWoMEAMQBBAJEAoQBRAQ',
+        songs: 'EgWKAQIIAWoMEA4QChADEAQQCRAF',
+        videos: 'EgWKAQIQAWoMEA4QChADEAQQCRAF',
+        albums: 'EgWKAQIYAWoMEA4QChADEAQQCRAF',
+        artists: 'EgWKAQIgAWoMEA4QChADEAQQCRAF',
+        playlists: 'Eg-KAQwIABAAGAAgACgBMABqChAEEAMQCRAFEAo%3D',
       };
       params['params'] = filterMap[filter];
     }
