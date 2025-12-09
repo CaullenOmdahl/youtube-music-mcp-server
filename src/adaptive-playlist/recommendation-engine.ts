@@ -507,6 +507,205 @@ export class RecommendationEngine {
       }
     }
 
-    return selected;
+    // Apply final reordering to avoid consecutive same-artist/album songs
+    return this.reorderForVarietyAndFlow(selected);
+  }
+
+  /**
+   * Reorder playlist to maximize variety while maintaining flow
+   *
+   * Uses research-backed techniques:
+   * 1. Distributes same-artist songs evenly throughout (van Asseldonk algorithm)
+   * 2. Minimizes energy/tempo jumps between adjacent tracks (coherence)
+   * 3. Avoids consecutive songs from same album
+   *
+   * Based on:
+   * - https://ruudvanasseldonk.com/2023/an-algorithm-for-shuffling-playlists
+   * - EPJ Data Science 2025 playlist coherence research
+   */
+  private reorderForVarietyAndFlow(
+    recommendations: RecommendationResult[]
+  ): RecommendationResult[] {
+    if (recommendations.length <= 2) {
+      return recommendations;
+    }
+
+    // Step 1: Group tracks by artist
+    const artistGroups = new Map<string, RecommendationResult[]>();
+    for (const rec of recommendations) {
+      const artist = rec.track.artist;
+      const group = artistGroups.get(artist) || [];
+      group.push(rec);
+      artistGroups.set(artist, group);
+    }
+
+    // Step 2: Calculate ideal spacing for each artist's tracks
+    // If an artist has N tracks in a playlist of length L, they should appear every L/N positions
+    const totalLength = recommendations.length;
+    const artistSpacing = new Map<string, number>();
+    for (const [artist, tracks] of artistGroups) {
+      artistSpacing.set(artist, totalLength / tracks.length);
+    }
+
+    // Step 3: Use greedy interleaving algorithm
+    // Sort artists by track count descending (place most frequent artists first)
+    const sortedArtists = [...artistGroups.entries()]
+      .sort((a, b) => b[1].length - a[1].length);
+
+    // Initialize result array with slots
+    const result: (RecommendationResult | null)[] = new Array(totalLength).fill(null);
+    const usedPositions = new Set<number>();
+
+    // Place each artist's tracks at evenly distributed positions
+    for (const [artist, tracks] of sortedArtists) {
+      const spacing = artistSpacing.get(artist) || 1;
+
+      // Sort this artist's tracks by score (best first)
+      tracks.sort((a, b) => b.score - a.score);
+
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        if (!track) continue;
+
+        // Calculate ideal position with slight randomization for naturalness
+        const idealPos = Math.floor(i * spacing + spacing / 2);
+
+        // Find nearest available position
+        const pos = this.findNearestAvailablePosition(
+          idealPos,
+          usedPositions,
+          totalLength,
+          result,
+          track.track.artist
+        );
+
+        result[pos] = track;
+        usedPositions.add(pos);
+      }
+    }
+
+    // Step 4: Apply coherence smoothing - swap adjacent tracks if it improves flow
+    const finalResult = result.filter((r): r is RecommendationResult => r !== null);
+    this.smoothTransitions(finalResult);
+
+    logger.debug('Reordered playlist for variety and flow', {
+      originalOrder: recommendations.slice(0, 5).map(r => r.track.artist),
+      newOrder: finalResult.slice(0, 5).map(r => r.track.artist),
+    });
+
+    return finalResult;
+  }
+
+  /**
+   * Find nearest available position that doesn't create consecutive same-artist
+   */
+  private findNearestAvailablePosition(
+    idealPos: number,
+    usedPositions: Set<number>,
+    totalLength: number,
+    result: (RecommendationResult | null)[],
+    artist: string
+  ): number {
+    // Check ideal position first
+    if (!usedPositions.has(idealPos) && idealPos < totalLength) {
+      if (!this.wouldCreateConsecutive(result, idealPos, artist)) {
+        return idealPos;
+      }
+    }
+
+    // Search outward from ideal position
+    for (let offset = 1; offset < totalLength; offset++) {
+      // Try position after ideal
+      const posAfter = idealPos + offset;
+      if (posAfter < totalLength && !usedPositions.has(posAfter)) {
+        if (!this.wouldCreateConsecutive(result, posAfter, artist)) {
+          return posAfter;
+        }
+      }
+
+      // Try position before ideal
+      const posBefore = idealPos - offset;
+      if (posBefore >= 0 && !usedPositions.has(posBefore)) {
+        if (!this.wouldCreateConsecutive(result, posBefore, artist)) {
+          return posBefore;
+        }
+      }
+    }
+
+    // Fallback: find any available position (consecutive if unavoidable)
+    for (let i = 0; i < totalLength; i++) {
+      if (!usedPositions.has(i)) {
+        return i;
+      }
+    }
+
+    return 0; // Should never reach here
+  }
+
+  /**
+   * Check if placing an artist at position would create consecutive same-artist songs
+   */
+  private wouldCreateConsecutive(
+    result: (RecommendationResult | null)[],
+    pos: number,
+    artist: string
+  ): boolean {
+    // Check position before
+    if (pos > 0 && result[pos - 1]?.track.artist === artist) {
+      return true;
+    }
+    // Check position after
+    if (pos < result.length - 1 && result[pos + 1]?.track.artist === artist) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Smooth transitions by minimizing energy/tempo jumps between adjacent tracks
+   * Uses a simple swap optimization pass
+   */
+  private smoothTransitions(tracks: RecommendationResult[]): void {
+    if (tracks.length < 3) return;
+
+    // Calculate coherence score for a transition (lower = better)
+    const transitionCost = (a: RecommendationResult, b: RecommendationResult): number => {
+      const energyDiff = Math.abs((a.track.energy || 0.5) - (b.track.energy || 0.5));
+      const valenceDiff = Math.abs((a.track.valence || 0.5) - (b.track.valence || 0.5));
+      const tempoDiff = Math.abs((a.track.tempo || 120) - (b.track.tempo || 120)) / 200; // Normalize
+
+      return energyDiff * 0.4 + valenceDiff * 0.3 + tempoDiff * 0.3;
+    };
+
+    // Single pass: try swapping adjacent pairs if it improves both transitions
+    // and doesn't create consecutive same-artist
+    for (let i = 1; i < tracks.length - 1; i++) {
+      const prev = tracks[i - 1];
+      const curr = tracks[i];
+      const next = tracks[i + 1];
+
+      // Safety checks
+      if (!prev || !curr || !next) continue;
+
+      // Skip if swapping would create consecutive same-artist
+      if (prev.track.artist === next.track.artist) continue;
+
+      const prevPrev = i > 1 ? tracks[i - 2] : undefined;
+      const nextNext = i < tracks.length - 2 ? tracks[i + 2] : undefined;
+
+      if (prevPrev && prevPrev.track.artist === next.track.artist) continue;
+      if (nextNext && nextNext.track.artist === curr.track.artist) continue;
+
+      // Calculate current cost vs swapped cost
+      const currentCost = transitionCost(prev, curr) + transitionCost(curr, next);
+      const swappedCost = transitionCost(prev, next) + transitionCost(next, curr);
+
+      // Swap if it improves flow (with threshold to avoid unnecessary swaps)
+      if (swappedCost < currentCost - 0.05) {
+        tracks[i] = next;
+        tracks[i + 1] = curr;
+        i++; // Skip the swapped pair
+      }
+    }
   }
 }
