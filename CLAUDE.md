@@ -174,6 +174,27 @@ BYPASS_AUTH_FOR_TESTING=true PORT=8084 node dist/index.js
 - Configure environment variables in Smithery dashboard
 - Redirect URI: `https://server.smithery.ai/@CaullenOmdahl/youtube-music-mcp-server/oauth/callback`
 
+## Playlist Creation Guidelines
+
+**IMPORTANT: When creating playlists (manually or via adaptive tools), follow these rules:**
+
+1. **Never add consecutive same-artist songs** - Distribute songs from the same artist evenly throughout the playlist
+2. **Calculate ideal spacing** - If adding N songs from one artist to a playlist of L songs, space them L/N positions apart
+3. **Avoid same-album clustering** - Treat multiple songs from the same album like same-artist songs
+4. **Consider transitions** - Minimize jarring energy/tempo jumps between adjacent tracks
+
+**When manually building playlists with `add_songs_to_playlist`:**
+1. Collect all songs first
+2. Group by artist to see distribution
+3. Reorder to distribute same-artist songs evenly
+4. Add songs in the reordered sequence
+
+**When using adaptive playlist tools:**
+- The `generate_adaptive_playlist` tool handles reordering automatically
+- Trust the algorithm - it uses research-backed distribution
+
+See `PLAYLIST_GUIDELINES.md` for detailed examples and research references.
+
 ## Important Notes
 
 - **OAuth Tokens**: Never commit or log tokens/secrets
