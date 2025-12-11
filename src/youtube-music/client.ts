@@ -1,8 +1,7 @@
 import got, { Got } from 'got';
-import { config } from '../config.js';
 import { createLogger } from '../utils/logger.js';
-import { RateLimiter } from '../utils/rate-limiter.js';
 import { tokenStore } from '../auth/token-store.js';
+import { config } from '../config.js';
 import type { Song, Album, Artist, Playlist, SearchResponse } from '../types/index.js';
 import {
   parseSearchResults,
@@ -49,16 +48,9 @@ export interface SearchOptions {
 
 export class YouTubeMusicClient {
   private client: Got;
-  private rateLimiter: RateLimiter;
   private visitorId: string | null = null;
 
   constructor() {
-    this.rateLimiter = new RateLimiter('youtube-music', {
-      requestsPerMinute: config.rateLimitPerMinute,
-      requestsPerHour: config.rateLimitPerHour,
-      burstLimit: config.burstLimit,
-    });
-
     this.client = got.extend({
       prefixUrl: YTM_API_URL,
       headers: {
@@ -157,8 +149,6 @@ export class YouTubeMusicClient {
     endpoint: string,
     body: Record<string, unknown>
   ): Promise<T> {
-    await this.rateLimiter.acquire();
-
     // InnerTube API uses API key, not OAuth Bearer tokens
     // The original working implementation did not use OAuth for these requests
     const headers: Record<string, string> = {};
@@ -579,13 +569,6 @@ export class YouTubeMusicClient {
   // ===========================================================================
   // Utility Methods
   // ===========================================================================
-
-  /**
-   * Get rate limiter statistics
-   */
-  getRateLimitStats() {
-    return this.rateLimiter.getStats();
-  }
 
   /**
    * Close the client and clean up resources

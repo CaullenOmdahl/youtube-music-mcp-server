@@ -67,27 +67,30 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
   );
 
   /**
-   * Get playlist details with tracks
+   * Get playlist details with tracks (with full pagination support)
    */
   server.registerTool(
     'get_playlist_details',
     {
       title: 'Get Playlist Details',
-      description: 'Get detailed playlist information including all tracks with song, album, artist, and duration.',
+      description: 'Get detailed playlist information including tracks with song, album, artist, and duration. Supports pagination to fetch all tracks. Set fetch_all=true to retrieve entire playlist regardless of size.',
       inputSchema: {
         playlist_id: z.string().describe('Playlist ID'),
-        limit: z.number().min(1).max(500).default(100).describe('Maximum number of tracks to return'),
+        limit: z.number().min(1).max(5000).default(200).describe('Maximum number of tracks to return (up to 5000)'),
+        fetch_all: z.boolean().default(false).describe('If true, fetches ALL tracks in the playlist (ignores limit)'),
       },
       annotations: {
         readOnlyHint: true,
         openWorldHint: true,
       },
     },
-    async ({ playlist_id, limit }) => {
-      logger.debug('get_playlist_details called', { playlist_id, limit });
+    async ({ playlist_id, limit, fetch_all }) => {
+      logger.debug('get_playlist_details called', { playlist_id, limit, fetch_all });
 
       try {
-        const items = await context.ytData.getPlaylistItems(playlist_id, limit);
+        // If fetch_all is true, use a very high limit to get everything
+        const effectiveLimit = fetch_all ? 10000 : limit;
+        const items = await context.ytData.getPlaylistItems(playlist_id, effectiveLimit);
 
         return {
           content: [
@@ -98,7 +101,8 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
                 tracks: items,
                 metadata: {
                   returned: items.length,
-                  limit,
+                  limit: fetch_all ? 'all' : limit,
+                  fetchedAll: fetch_all,
                 },
               }, null, 2),
             },

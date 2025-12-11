@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an enterprise-grade Model Context Protocol (MCP) server that provides YouTube Music functionality to AI agents through OAuth 2.1 authentication. Built with TypeScript using the MCP SDK, it features HTTP transport, AI-powered adaptive playlist generation using Reccobeats, MusicBrainz, ListenBrainz, and Spotify APIs, and comprehensive rate limiting with batched API calls.
+This is an enterprise-grade Model Context Protocol (MCP) server that provides YouTube Music functionality to AI agents through OAuth 2.1 authentication. Built with TypeScript using the MCP SDK, it features HTTP transport, AI-powered adaptive playlist generation using Reccobeats, MusicBrainz, ListenBrainz, and Spotify APIs.
 
 **Key Technology Stack:**
 - TypeScript with strict type checking
@@ -105,9 +105,8 @@ smithery deploy
    - **MusicBrainz/ListenBrainz**: Metadata enrichment and discovery
    - **Spotify**: Audio features and genre classification
 4. **Shared Token Store**: Tokens accessible across OAuth provider and clients
-5. **Batched API Calls**: Controlled concurrency (5 concurrent requests) with delays to respect rate limits
-6. **Rate Limiting**: 120 req/min, burst 20 req/10sec, 2000 req/hour
-7. **Structured Logging**: All components use consistent logging
+5. **Full Pagination Support**: `get_playlist_details` can fetch entire playlists with `fetch_all=true`
+6. **Structured Logging**: All components use consistent logging
 
 ## MCP Tools Available (23 total)
 
@@ -122,7 +121,7 @@ smithery deploy
 
 ### Playlist Tools (7)
 - `get_playlists` - Get user's playlists
-- `get_playlist_details` - Get playlist with tracks
+- `get_playlist_details` - Get playlist with tracks (supports `fetch_all=true` to get entire playlist)
 - `create_playlist` - Create new playlist
 - `edit_playlist` - Edit playlist metadata
 - `delete_playlist` - Delete playlist
@@ -154,9 +153,6 @@ smithery deploy
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | Yes | - |
 | `GOOGLE_REDIRECT_URI` | OAuth redirect URI | Yes | - |
 | `ENCRYPTION_KEY` | Base64 32-byte key | Yes | - |
-| `RATE_LIMIT_PER_MINUTE` | Rate limit per minute | No | `120` |
-| `RATE_LIMIT_PER_HOUR` | Rate limit per hour | No | `2000` |
-| `BURST_LIMIT` | Max requests per 10 seconds | No | `20` |
 | `SPOTIFY_CLIENT_ID` | Spotify API Client ID | No | - |
 | `SPOTIFY_CLIENT_SECRET` | Spotify API Client Secret | No | - |
 | `PORT` | Server port | No | `8081` |
@@ -199,5 +195,5 @@ See `PLAYLIST_GUIDELINES.md` for detailed examples and research references.
 
 - **OAuth Tokens**: Never commit or log tokens/secrets
 - **Type Safety**: Strict TypeScript - no `any` without justification
-- **Rate Limiting**: Respect YouTube API quotas
+- **MusicBrainz Rate Limit**: MusicBrainz has a strict 1 req/sec limit (enforced in code)
 - **.env files**: Never commit - use Smithery config for deployment
