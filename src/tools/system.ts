@@ -92,7 +92,7 @@ export function registerSystemTools(server: McpServer, context: ServerContext): 
     'get_server_status',
     {
       title: 'Get Server Status',
-      description: 'Get server health, version, uptime, and rate limit status.',
+      description: 'Get server health, version, and uptime.',
       inputSchema: {},
       annotations: {
         readOnlyHint: true,
@@ -103,7 +103,6 @@ export function registerSystemTools(server: McpServer, context: ServerContext): 
 
       try {
         const uptime = Math.floor((Date.now() - startTime) / 1000);
-        const rateLimitStats = context.ytMusic.getRateLimitStats();
 
         return {
           content: [
@@ -115,9 +114,6 @@ export function registerSystemTools(server: McpServer, context: ServerContext): 
                 uptime: {
                   seconds: uptime,
                   formatted: formatUptime(uptime),
-                },
-                rateLimits: {
-                  youtubeMusic: rateLimitStats,
                 },
                 environment: {
                   nodeEnv: config.nodeEnv,
