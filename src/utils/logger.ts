@@ -16,7 +16,9 @@ const loggerConfig: winston.LoggerOptions = {
     ? combine(timestamp(), json())
     : combine(timestamp({ format: 'HH:mm:ss' }), colorize(), devFormat),
   transports: [
-    new winston.transports.Console(),
+    new winston.transports.Console({
+      stderrLevels: Object.keys(winston.config.npm.levels),
+    }),
   ],
 };
 

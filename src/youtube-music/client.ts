@@ -149,9 +149,13 @@ export class YouTubeMusicClient {
     endpoint: string,
     body: Record<string, unknown>
   ): Promise<T> {
-    // InnerTube API uses API key, not OAuth Bearer tokens
-    // The original working implementation did not use OAuth for these requests
     const headers: Record<string, string> = {};
+
+    // Add OAuth Bearer token when available (enables personal library access)
+    const token = tokenStore.getCurrentToken();
+    if (token && token.expiresAt > Date.now()) {
+      headers['Authorization'] = `Bearer ${token.accessToken}`;
+    }
 
     try {
       const response = await this.client.post<T>(endpoint, {

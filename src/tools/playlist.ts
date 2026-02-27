@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { ServerContext } from '../server.js';
 import { createLogger } from '../utils/logger.js';
+import { sessionCache } from '../utils/session-cache.js';
 
 const logger = createLogger('playlist-tools');
 
@@ -16,50 +17,61 @@ export function registerPlaylistTools(server: McpServer, context: ServerContext)
     'get_playlists',
     {
       title: 'Get Playlists',
-      description: 'Get the user\'s playlists from YouTube Music library. Returns playlist name, ID, and track count as structured JSON.',
+      description: 'Get the user\'s playlists from YouTube Music library. Returns playlist name, ID, and track count as structured JSON. Results are cached in memory for the session — subsequent calls return the cached result instantly without a network request. Pass force_refresh=true only if the user explicitly asks to refresh.',
       inputSchema: {
-        limit: z.number().min(1).max(100).default(25).describe('Maximum number of playlists to return'),
+        limit: z.number().min(1).max(100).describe('Maximum number of playlists to return (default: 25)'),
+        force_refresh: z.boolean().describe('If true, bypasses cache and fetches fresh data from YouTube Music (default: false)'),
       },
       annotations: {
         readOnlyHint: true,
         openWorldHint: true,
       },
     },
-    async ({ limit }) => {
-      logger.debug('get_playlists called', { limit });
+    async ({ limit, force_refresh }) => {
+      const effectiveLimit = limit ?? 25;
+      const refresh = force_refresh ?? false;
+      const CACHE_KEY = 'playlists';
+
+      logger.debug('get_playlists called', { effectiveLimit, refresh, cached: sessionCache.has(CACHE_KEY) });
 
       try {
-        const playlists = await context.ytData.getPlaylists(limit);
+        if (!refresh && sessionCache.has(CACHE_KEY)) {
+          const cached = sessionCache.get<{ playlists: unknown[]; metadata: unknown }>(CACHE_KEY)!;
+          logger.debug('get_playlists: returning cached result');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({ ...cached, cached: true }, null, 2),
+            }],
+          };
+        }
+
+        const playlists = await context.ytData.getPlaylists(effectiveLimit);
+        const result = {
+          playlists: playlists.map(p => ({
+            id: p.id,
+            name: p.title,
+            description: p.description,
+            privacy: p.privacy,
+            trackCount: p.videoCount,
+          })),
+          metadata: { returned: playlists.length, limit: effectiveLimit },
+        };
+        sessionCache.set(CACHE_KEY, result);
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                playlists: playlists.map(p => ({
-                  id: p.id,
-                  name: p.title,
-                  description: p.description,
-                  privacy: p.privacy,
-                  trackCount: p.videoCount,
-                })),
-                metadata: {
-                  returned: playlists.length,
-                  limit,
-                },
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ ...result, cached: false }, null, 2),
+          }],
         };
       } catch (error) {
         logger.error('get_playlists failed', { error });
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ error: 'Failed to get playlists' }),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: 'Failed to get playlists' }),
+          }],
           isError: true,
         };
       }

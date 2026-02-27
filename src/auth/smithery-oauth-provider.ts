@@ -98,8 +98,10 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
   ): Promise<void> {
     // Use our callback endpoint as the redirect_uri
     // Google will redirect here after user authorization
-    const ourRedirectUri = config.googleRedirectUri ||
-      `https://ytmusic.dumawtf.com/oauth/callback`;
+    const ourRedirectUri = config.googleRedirectUri;
+    if (!ourRedirectUri) {
+      throw new Error('GOOGLE_REDIRECT_URI environment variable is required for OAuth');
+    }
 
     // Store the client info in state so we can retrieve it in the callback
     // The state parameter will be echoed back by Google
@@ -153,8 +155,10 @@ class DynamicClientProxyProvider extends ProxyOAuthServerProvider {
     resource?: URL
   ) {
     // Use OUR redirect_uri (must match what we sent to Google)
-    const ourRedirectUri = config.googleRedirectUri ||
-      `https://ytmusic.dumawtf.com/oauth/callback`;
+    const ourRedirectUri = config.googleRedirectUri;
+    if (!ourRedirectUri) {
+      throw new Error('GOOGLE_REDIRECT_URI environment variable is required for OAuth');
+    }
 
     // Create a client object with Google's credentials for the upstream exchange
     // The 'client' parameter has the registered client's credentials (used for validation)

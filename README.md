@@ -4,155 +4,245 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 
-**Full-featured MCP server for YouTube Music** — search, manage playlists, and create smart recommendations through AI assistants.
+MCP server for YouTube Music — search songs, manage playlists, and get AI-powered recommendations through Claude Desktop or any MCP-compatible client.
 
-## Highlights
+## How it works
 
-- **Complete Playlist Control** — Create, edit, delete playlists with batch operations
-- **Smart Recommendations** — AI-driven playlist creation using ListenBrainz (unbiased, no payola)
-- **Rich Metadata** — Every response includes artist, album, year, and duration
-- **Secure Auth** — OAuth 2.1 + PKCE with encrypted token storage
-- **Rate Limited** — Configurable limits to respect API quotas
+The server runs as a **stdio process** launched directly by Claude Desktop. It communicates via stdin/stdout using the MCP protocol — no port, no separate server to keep running.
 
-## Quick Start
+```
+Claude Desktop → spawns → node dist/index.js → talks to YouTube Music APIs
+```
+
+Authentication is handled separately via a one-time OAuth flow (`npm run auth`). The resulting tokens are saved to disk and loaded automatically on every start.
+
+## Prerequisites
+
+- Node.js 20+
+- A Google Cloud project with **YouTube Data API v3** enabled
+- A Google OAuth 2.0 client (Desktop app type)
+- Your Google account added as a **Test User** in the OAuth consent screen
+
+## Setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
-cp .env.example .env
-# Add your Google OAuth credentials to .env
-npm run build
-npm start
 ```
 
-### MCP Configuration
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Fill in `.env`:
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=your-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+ENCRYPTION_KEY=                  # generate with: openssl rand -base64 32
+```
+
+> **Note:** `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` are optional. They enable audio feature analysis (tempo, energy, valence). The server works without them.
+
+### 3. Build
+
+```bash
+npm run build
+```
+
+### 4. Authenticate with Google (one time)
+
+```bash
+npm run auth
+```
+
+This opens your browser, you log in with Google, and the tokens are saved to `~/.youtube-music-mcp/tokens.json`. You only need to do this once — the refresh token keeps the session alive.
+
+> **If you see "Error 403: access_denied":** Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → OAuth consent screen → Test users → add your Google email.
+
+### 5. Configure Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "youtube-music": {
       "command": "node",
-      "args": ["path/to/youtube-music-mcp-server/dist/index.js"],
+      "args": ["/absolute/path/to/youtube-music-mcp-server/dist/index.js"],
       "env": {
         "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret"
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",
+        "ENCRYPTION_KEY": "your-encryption-key",
+        "BYPASS_AUTH_FOR_TESTING": "true",
+        "TOKEN_STORAGE_PATH": "/Users/your-user/.youtube-music-mcp/tokens.json"
       }
     }
   }
 }
 ```
 
-## Tools
+### 6. Restart Claude Desktop
 
-### Search & Discovery
+The server starts automatically when Claude Desktop launches.
+
+---
+
+## Tools (23 total)
+
+### Search & Discovery — no auth required
+
 | Tool | Description |
 |------|-------------|
-| `search_songs` | Search songs with configurable limits |
+| `search_songs` | Search songs by name, lyrics, or artist |
 | `search_albums` | Search albums |
 | `search_artists` | Search artists |
-| `get_song_info` | Detailed song information |
-| `get_album_info` | Album with all tracks |
+| `get_song_info` | Detailed song metadata |
+| `get_album_info` | Album with full tracklist |
 | `get_artist_info` | Artist with top songs |
-| `get_library_songs` | User's liked music (filters non-music) |
 
-### Playlist Management
+### Library & Playlists — requires Google auth
+
 | Tool | Description |
 |------|-------------|
-| `get_playlists` | List user's playlists |
-| `get_playlist_details` | Playlist with all tracks |
-| `create_playlist` | Create new playlist |
-| `edit_playlist` | Update metadata |
-| `delete_playlist` | Delete playlist |
-| `add_songs_to_playlist` | Batch add songs |
-| `remove_songs_from_playlist` | Batch remove songs |
+| `get_library_songs` | Your liked songs from YouTube Music |
+| `get_playlists` | All your playlists |
+| `get_playlist_details` | Playlist tracks (supports `fetch_all=true`) |
+| `create_playlist` | Create a new playlist |
+| `edit_playlist` | Rename or change description |
+| `delete_playlist` | Delete a playlist |
+| `add_songs_to_playlist` | Add songs in batch |
+| `remove_songs_from_playlist` | Remove songs in batch |
 
-### Smart Playlists
+### Adaptive Playlists — AI-powered
+
 | Tool | Description |
 |------|-------------|
-| `start_smart_playlist` | Begin creation session |
-| `add_seed_artist` | Add artist influence |
-| `add_seed_track` | Add track as seed |
-| `refine_recommendations` | Set preferences (exclude, tags, diversity) |
-| `get_recommendations` | Generate recommendations |
-| `preview_playlist` | Preview before creating |
-| `create_smart_playlist` | Create on YouTube Music |
-| `get_user_taste_profile` | Analyze listening habits |
+| `start_playlist_conversation` | Start a session to gather preferences |
+| `continue_conversation` | Keep refining preferences |
+| `generate_adaptive_playlist` | Generate a curated playlist |
+| `view_profile` | See your extracted taste profile |
+| `decode_playlist_profile` | Decode profile from a playlist description |
 
-## Response Format
+### Recommendations
 
-All tools return structured JSON with metadata:
+| Tool | Description |
+|------|-------------|
+| `get_audio_features` | Get valence/energy/tempo for tracks (via Reccobeats) |
+| `get_music_recommendations` | Mood and seed-based recommendations |
 
-```json
-{
-  "songs": [{
-    "videoId": "abc123",
-    "title": "Song Title",
-    "artists": [{"id": "...", "name": "Artist"}],
-    "album": {"id": "...", "name": "Album", "year": 2023},
-    "duration": "3:45",
-    "durationSeconds": 225
-  }],
-  "metadata": {
-    "returned": 20,
-    "hasMore": true
-  }
-}
+### System
+
+| Tool | Description |
+|------|-------------|
+| `get_auth_status` | Check if Google auth is active |
+| `get_server_status` | Server health and uptime |
+
+---
+
+## Workflow Prompts
+
+The server includes 5 built-in prompts accessible from Claude:
+
+- **Search Songs & Create Playlist** — find songs by theme and build a playlist
+- **Discover Artist** — explore an artist's discography
+- **Manage Playlist** — view, add to, or reorganize a playlist
+- **Smart Recommendations** — get mood-based recommendations
+- **Browse My Library** — overview of your liked songs and playlists
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GOOGLE_OAUTH_CLIENT_ID` | Yes | Google OAuth 2.0 Client ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Yes | Google OAuth 2.0 Client Secret |
+| `ENCRYPTION_KEY` | Yes | Base64 32-byte key for token storage (`openssl rand -base64 32`) |
+| `TOKEN_STORAGE_PATH` | No | Where to store OAuth tokens (default: `~/.youtube-music-mcp/tokens.json`) |
+| `SPOTIFY_CLIENT_ID` | No | Spotify Client ID (enables audio features) |
+| `SPOTIFY_CLIENT_SECRET` | No | Spotify Client Secret |
+| `DATABASE_URL` | No | PostgreSQL URL (enables adaptive playlist memory) |
+| `BYPASS_AUTH_FOR_TESTING` | No | Set `true` to skip MCP-level OAuth (needed for Claude Desktop stdio mode) |
+| `PORT` | No | HTTP server port (default: `8081`, only used in `npm run dev`) |
+
+---
+
+## Development
+
+```bash
+npm run dev      # HTTP server mode on port 8081 (for Smithery / web clients)
+npm run auth     # Run the local OAuth flow once
+npm run build    # Compile TypeScript
+npm run test     # Run tests
+npm run lint     # Lint
 ```
 
-## Example Workflows
+### Two transport modes
 
-**"Make me a playlist based on Radiohead and Boards of Canada"**
-```
-→ start_smart_playlist()
-→ add_seed_artist("Radiohead")
-→ add_seed_artist("Boards of Canada")
-→ get_recommendations()
-→ create_smart_playlist("Late Night Electronica")
-```
+| Mode | Command | Use case |
+|------|---------|----------|
+| **stdio** | `node dist/index.js` | Claude Desktop — spawned as subprocess |
+| **HTTP** | `npm run dev` | Smithery, web clients, remote deployment |
 
-**"Add these songs to my workout playlist"**
-```
-→ search_songs("high energy workout")
-→ add_songs_to_playlist(playlistId, [videoId1, videoId2, ...])
-```
+---
+
+## Google Cloud Setup
+
+1. Create a project at [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable **YouTube Data API v3**
+3. Create an OAuth 2.0 credential — type **Desktop app**
+4. In **OAuth consent screen** → add your Google email under **Test users**
+5. Download the credentials JSON and copy `client_id` and `client_secret` to `.env`
+
+---
 
 ## Architecture
 
 ```
 src/
-├── index.ts              # Entry point
-├── server.ts             # MCP server setup
-├── youtube-music/        # Custom YTM client
-│   ├── client.ts         # API methods
-│   └── parsers.ts        # Response parsing
-├── musicbrainz/          # MusicBrainz integration
-├── listenbrainz/         # ListenBrainz recommendations
-├── recommendations/      # Smart playlist engine
-├── auth/                 # OAuth 2.1 + PKCE
-└── tools/                # MCP tool definitions
+├── index.ts                    # Smithery + stdio entry point
+├── main.ts                     # HTTP server entry point (npm run dev)
+├── server.ts                   # Express + MCP HTTP server
+├── config.ts                   # Environment variable validation (Zod)
+├── auth/
+│   ├── smithery-oauth-provider.ts  # Google OAuth proxy for HTTP mode
+│   └── token-store.ts          # Encrypted token persistence
+├── youtube-music/
+│   ├── client.ts               # InnerTube API client (search, library)
+│   └── parsers.ts              # Response parsers
+├── youtube-data/
+│   └── client.ts               # YouTube Data API v3 (playlists)
+├── musicbrainz/ listenbrainz/ spotify/ reccobeats/
+│   └── client.ts               # Third-party API clients
+├── adaptive-playlist/          # AI playlist generation engine
+├── recommendations/            # Seed-based recommendation engine
+├── tools/
+│   ├── query.ts                # Search tools
+│   ├── playlist.ts             # Playlist CRUD tools
+│   ├── adaptive-playlist.ts    # Adaptive playlist tools
+│   ├── reccobeats.ts           # Recommendation tools
+│   ├── system.ts               # Auth/status tools
+│   └── prompts.ts              # Workflow prompts
+└── utils/
+    ├── logger.ts               # Winston logger (writes to stderr)
+    └── rate-limiter.ts         # Request batching and rate limiting
+scripts/
+└── auth.ts                     # Local OAuth flow (npm run auth)
 ```
 
-## Docker
-
-```bash
-docker build -t youtube-music-mcp .
-docker run -p 8081:8081 \
-  -e GOOGLE_OAUTH_CLIENT_ID="..." \
-  -e GOOGLE_OAUTH_CLIENT_SECRET="..." \
-  youtube-music-mcp
-```
-
-## Development
-
-```bash
-npm run dev                           # Development mode
-BYPASS_AUTH_FOR_TESTING=true npm run dev  # Skip OAuth for testing
-```
+---
 
 ## Links
 
 - [Model Context Protocol](https://modelcontextprotocol.io/)
-- [ListenBrainz](https://listenbrainz.org/) — Open music recommendations
-- [MusicBrainz](https://musicbrainz.org/) — Open music database
+- [YouTube Data API v3](https://developers.google.com/youtube/v3)
+- [ListenBrainz](https://listenbrainz.org/) — open music recommendations
+- [MusicBrainz](https://musicbrainz.org/) — open music database
+- [Reccobeats](https://reccobeats.com/) — mood-based recommendations
 
 ## License
 

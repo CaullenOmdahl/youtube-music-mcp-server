@@ -1,0 +1,2 @@
+runtime: "typescript"
+# configSchema is auto-detected from the TypeScript export in src/index.ts

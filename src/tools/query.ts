@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { ServerContext } from '../server.js';
 import { createLogger } from '../utils/logger.js';
+import { sessionCache } from '../utils/session-cache.js';
 
 const logger = createLogger('query-tools');
 
@@ -307,44 +308,52 @@ export function registerQueryTools(server: McpServer, context: ServerContext): v
     'get_library_songs',
     {
       title: 'Get Library Songs',
-      description: 'Get the user\'s liked songs from their YouTube Music library. Returns structured JSON with song details.',
+      description: 'Get the user\'s liked songs from their YouTube Music library. Results are cached in memory for the session — subsequent calls return the cached result instantly without a network request. Pass force_refresh=true only if the user explicitly asks to refresh.',
       inputSchema: {
-        limit: z.number().min(1).max(500).default(100).describe('Maximum number of songs to return'),
+        limit: z.number().min(1).max(500).describe('Maximum number of songs to return (default: 100)'),
+        force_refresh: z.boolean().describe('If true, bypasses cache and fetches fresh data from YouTube Music (default: false)'),
       },
       annotations: {
         readOnlyHint: true,
         openWorldHint: true,
       },
     },
-    async ({ limit }) => {
-      logger.debug('get_library_songs called', { limit });
+    async ({ limit, force_refresh }) => {
+      const effectiveLimit = limit ?? 100;
+      const refresh = force_refresh ?? false;
+      const CACHE_KEY = 'library_songs';
+
+      logger.debug('get_library_songs called', { effectiveLimit, refresh, cached: sessionCache.has(CACHE_KEY) });
 
       try {
-        const songs = await context.ytData.getLikedVideos(limit);
+        if (!refresh && sessionCache.has(CACHE_KEY)) {
+          const cached = sessionCache.get<{ songs: unknown[]; metadata: unknown }>(CACHE_KEY)!;
+          logger.debug('get_library_songs: returning cached result');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({ ...cached, cached: true }, null, 2),
+            }],
+          };
+        }
+
+        const songs = await context.ytData.getLikedVideos(effectiveLimit);
+        const result = { songs, metadata: { returned: songs.length, limit: effectiveLimit } };
+        sessionCache.set(CACHE_KEY, result);
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                songs,
-                metadata: {
-                  returned: songs.length,
-                  limit,
-                },
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ ...result, cached: false }, null, 2),
+          }],
         };
       } catch (error) {
         logger.error('get_library_songs failed', { error });
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ error: 'Failed to get library songs' }),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: 'Failed to get library songs' }),
+          }],
           isError: true,
         };
       }

@@ -18,7 +18,7 @@ const ConfigSchema = z.object({
   googleRedirectUri: z.string().url().optional(),
 
   // Encryption
-  encryptionKey: z.string().min(32).optional(),
+  encryptionKey: z.string().min(32),
 
   // MusicBrainz (has strict 1 req/sec limit enforced by their API)
   musicBrainzRateLimit: z.number().default(1000), // 1 request per second
@@ -75,7 +75,8 @@ function loadConfig() {
 
     sessionTtl: parseInt(process.env['SESSION_TTL'] ?? '3600', 10),
 
-    tokenStoragePath: process.env['TOKEN_STORAGE_PATH'] ?? '/data/tokens.json',
+    tokenStoragePath: process.env['TOKEN_STORAGE_PATH'] ??
+      `${process.env['HOME'] ?? '/tmp'}/.youtube-music-mcp/tokens.json`,
 
     bypassAuth: process.env['BYPASS_AUTH_FOR_TESTING'] === 'true',
   };
@@ -87,6 +88,15 @@ function loadConfig() {
     }
     if (!rawConfig.googleClientSecret) {
       rawConfig.googleClientSecret = 'bypass-testing';
+    }
+    if (!rawConfig.encryptionKey) {
+      rawConfig.encryptionKey = 'bypass-testing-insecure-key-not-for-production!!';
+    }
+    if (!rawConfig.spotifyClientId) {
+      rawConfig.spotifyClientId = 'bypass-testing';
+    }
+    if (!rawConfig.spotifyClientSecret) {
+      rawConfig.spotifyClientSecret = 'bypass-testing';
     }
   }
 

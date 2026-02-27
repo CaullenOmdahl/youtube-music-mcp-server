@@ -192,9 +192,7 @@ class TokenStore {
   private getEncryptionKey(): Buffer {
     const key = config.encryptionKey;
     if (!key) {
-      logger.warn('No encryption key configured, using insecure default');
-      // This should not happen in production - ENCRYPTION_KEY env var should be set
-      return Buffer.from('default-insecure-key-32-bytes!'); // 32 bytes
+      throw new Error('ENCRYPTION_KEY environment variable is required for token storage');
     }
 
     // Convert base64 key to buffer, or hash if it's not base64
